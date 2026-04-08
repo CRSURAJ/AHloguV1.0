@@ -5,6 +5,8 @@ export type BreakPeriod = {
 
 export type PendingActionType = "start" | "stop" | "break_start" | "break_end";
 
+export type SyncStatus = "pending" | "syncing" | "synced" | "failed";
+
 export type PendingAction = {
   id: string;
   type: PendingActionType;
@@ -14,10 +16,10 @@ export type PendingAction = {
     jobId: string;
     location: string;
     description: string;
-    note: string;
+    role: string;
     ts: string;
   };
-  status: "pending" | "synced";
+  status: SyncStatus;
 };
 
 export type WorkSession = {
@@ -26,11 +28,11 @@ export type WorkSession = {
   jobId: string;
   location: string;
   description: string;
-  note: string;
+  role: string;
   startedAt: string;
   stoppedAt?: string;
   breaks: BreakPeriod[];
-  syncState: "pending" | "partial" | "synced";
+  syncState: SyncStatus;
 };
 
 export type DemoState = {

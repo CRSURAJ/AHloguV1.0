@@ -1,140 +1,207 @@
 "use client";
 
-import { useEffect, useState } from "react";
-const TB_URL = "https://ahconnect.automaticheating.com.au/api/v1/W3fZovDPT4Au9WuhnSar/telemetry";
+import { useEffect, useMemo, useState } from "react";
+import styles from "./WorkLogger.module.css";
+
+const TB_URL =
+  "https://ahconnect.automaticheating.com.au/api/v1/W3fZovDPT4Au9WuhnSar/telemetry";
+
+const FULL_NAME_OPTIONS = ["", "Suraj", "Name 2", "Name 3"];
+
+type SyncStatus = "pending" | "syncing" | "synced" | "failed";
+
+type LogItem = {
+  id: number;
+  ts: number;
+  fullname: string;
+  jobId: string;
+  location: string;
+  role: string;
+  description: string;
+  startedAt: string;
+  stoppedAt: string;
+  breakMinutes: number;
+  workedMinutes: number;
+  syncStatus: SyncStatus;
+  syncMessage: string;
+};
+
 export default function WorkLogger() {
-  const [fullname, setfullname] = useState("Suraj");
-  const [jobId, setJobId] = useState("JOB-1001");
-  const [location, setLocation] = useState("Factory Bay 1");
+  const [fullname, setFullname] = useState("");
+  const [jobId, setJobId] = useState("");
+  const [location, setLocation] = useState("");
+  const [role, setRole] = useState("");
   const [description, setDescription] = useState("");
-  const [note, setNote] = useState("");
+
   const [isWorking, setIsWorking] = useState(false);
   const [isOnBreak, setIsOnBreak] = useState(false);
   const [startTime, setStartTime] = useState<string | null>(null);
-const [breakStartTime, setBreakStartTime] = useState<string | null>(null);
-const [breakMinutes, setBreakMinutes] = useState(0);
-const [logs, setLogs] = useState<any[]>([]);
-async function sendToThingsBoard(
-  eventType: "start" | "stop" | "break_start" | "break_end"
-) {
-  const payload = {
-    ts: Date.now(),
-    values: {
-      eventType,
+  const [breakStartTime, setBreakStartTime] = useState<string | null>(null);
+  const [breakMinutes, setBreakMinutes] = useState(0);
+
+  const [logs, setLogs] = useState<LogItem[]>([]);
+  const [bannerMessage, setBannerMessage] = useState("");
+
+  useEffect(() => {
+    const raw = localStorage.getItem("project_logu_logs");
+    if (!raw) return;
+
+    try {
+      const parsed = JSON.parse(raw) as LogItem[];
+      setLogs(parsed);
+    } catch {
+      setLogs([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("project_logu_logs", JSON.stringify(logs));
+  }, [logs]);
+
+  const pendingCount = useMemo(
+    () =>
+      logs.filter(
+        (item) => item.syncStatus === "pending" || item.syncStatus === "failed"
+      ).length,
+    [logs]
+  );
+
+  const canStart =
+    !isWorking &&
+    fullname.trim() !== "" &&
+    jobId.trim() !== "" &&
+    role.trim() !== "" &&
+    location.trim() !== "";
+
+  const canBreak = isWorking;
+  const canStop = isWorking && description.trim() !== "";
+
+  function getWorkingStatusText() {
+    if (isOnBreak) return "On break";
+    if (isWorking) return "Working";
+    return "Idle";
+  }
+
+  function validateBeforeStart() {
+    if (fullname.trim() === "") return "Full name is required.";
+    if (jobId.trim() === "") return "Job ID is required.";
+    if (role.trim() === "") return "Role is required.";
+    if (location.trim() === "") return "Location is required.";
+    return "";
+  }
+
+  function handleStart() {
+    const validationError = validateBeforeStart();
+    if (validationError) {
+      setBannerMessage(validationError);
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    setDescription("");
+    setIsWorking(true);
+    setIsOnBreak(false);
+    setStartTime(now);
+    setBreakStartTime(null);
+    setBreakMinutes(0);
+    setBannerMessage("Work started. Complete description before stopping.");
+  }
+
+  function handleBreak() {
+    if (!isWorking) return;
+
+    const now = new Date();
+
+    if (!isOnBreak) {
+      setIsOnBreak(true);
+      setBreakStartTime(now.toISOString());
+      setBannerMessage("Break started.");
+      return;
+    }
+
+    if (breakStartTime) {
+      const diffMs = now.getTime() - new Date(breakStartTime).getTime();
+      const mins = Math.round(diffMs / 60000);
+      setBreakMinutes((prev) => prev + Math.max(0, mins));
+    }
+
+    setIsOnBreak(false);
+    setBreakStartTime(null);
+    setBannerMessage("Break ended.");
+  }
+
+  function handleStop() {
+    if (!isWorking || !startTime) return;
+
+    if (description.trim() === "") {
+      setBannerMessage("Description is required before stopping.");
+      return;
+    }
+
+    const stopTime = new Date().toISOString();
+
+    let finalBreakMinutes = breakMinutes;
+
+    if (isOnBreak && breakStartTime) {
+      const diffMs =
+        new Date(stopTime).getTime() - new Date(breakStartTime).getTime();
+      finalBreakMinutes += Math.max(0, Math.round(diffMs / 60000));
+    }
+
+    const totalMinutes = Math.max(
+      0,
+      Math.round(
+        (new Date(stopTime).getTime() - new Date(startTime).getTime()) / 60000
+      )
+    );
+
+    const workedMinutes = Math.max(0, totalMinutes - finalBreakMinutes);
+
+    const logItem: LogItem = {
+      id: Date.now(),
+      ts: new Date(stopTime).getTime(),
       fullname,
       jobId,
       location,
+      role,
       description,
-      note,
-      isWorking,
-      isOnBreak,
-    },
-  };
+      startedAt: startTime,
+      stoppedAt: stopTime,
+      breakMinutes: finalBreakMinutes,
+      workedMinutes,
+      syncStatus: "pending",
+      syncMessage: "Waiting to sync",
+    };
 
-  const res = await fetch(TB_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+    setLogs((prev) => [logItem, ...prev]);
 
-  if (!res.ok) {
-    throw new Error("Failed to send telemetry to ThingsBoard");
-  }
-}
-useEffect(() => {
-  const raw = localStorage.getItem("project_logu_logs");
-  if (raw) {
-    setLogs(JSON.parse(raw));
-  }
-}, []);
-
-useEffect(() => {
-  localStorage.setItem("project_logu_logs", JSON.stringify(logs));
-}, [logs]);
- function handleStart() {
-  const now = new Date().toISOString();
-  setIsWorking(true);
-  setIsOnBreak(false);
-  setStartTime(now);
-  setBreakStartTime(null);
-  setBreakMinutes(0);
-}
- function handleBreak() {
-  if (!isWorking) return;
-
-  const now = new Date();
-
-  if (!isOnBreak) {
-    setIsOnBreak(true);
-    setBreakStartTime(now.toISOString());
-    return;
+    setIsWorking(false);
+    setIsOnBreak(false);
+    setStartTime(null);
+    setBreakStartTime(null);
+    setBreakMinutes(0);
+    setDescription("");
+    setBannerMessage("Work stopped. Log saved as pending.");
   }
 
-  if (breakStartTime) {
-    const diffMs = now.getTime() - new Date(breakStartTime).getTime();
-    const mins = Math.round(diffMs / 60000);
-    setBreakMinutes((prev) => prev + Math.max(0, mins));
-  }
+  async function syncOneItem(item: LogItem) {
+    setLogs((prev) =>
+      prev.map((log) =>
+        log.id === item.id
+          ? { ...log, syncStatus: "syncing", syncMessage: "Syncing..." }
+          : log
+      )
+    );
 
-  setIsOnBreak(false);
-  setBreakStartTime(null);
-}
- function handleStop() {
-  if (!isWorking || !startTime) return;
-
-  const stopTime = new Date().toISOString();
-
-  let finalBreakMinutes = breakMinutes;
-
-  if (isOnBreak && breakStartTime) {
-    const diffMs = new Date(stopTime).getTime() - new Date(breakStartTime).getTime();
-    finalBreakMinutes += Math.max(0, Math.round(diffMs / 60000));
-  }
-
-  const totalMinutes = Math.max(
-    0,
-    Math.round((new Date(stopTime).getTime() - new Date(startTime).getTime()) / 60000)
-  );
-
-  const workedMinutes = Math.max(0, totalMinutes - finalBreakMinutes);
-
-  const logItem = {
-    id: Date.now(),
-    ts: new Date(stopTime).getTime(),
-    fullname,
-    jobId,
-    location,
-    description,
-    note,
-    startedAt: startTime,
-    stoppedAt: stopTime,
-    breakMinutes: finalBreakMinutes,
-    workedMinutes,
-    synced: false,
-  };
-
-  setLogs((prev) => [logItem, ...prev]);
-
-  setIsWorking(false);
-  setIsOnBreak(false);
-  setStartTime(null);
-  setBreakStartTime(null);
-  setBreakMinutes(0);
-}
-async function handleSync() {
-  const unsynced = logs.filter((item) => !item.synced);
-
-  for (const item of unsynced) {
     const payload = {
       ts: item.ts,
       values: {
         fullname: item.fullname,
         jobId: item.jobId,
         location: item.location,
+        role: item.role,
         description: item.description,
-        note: item.note,
         startedAt: item.startedAt,
         stoppedAt: item.stoppedAt,
         breakMinutes: item.breakMinutes,
@@ -142,203 +209,238 @@ async function handleSync() {
       },
     };
 
-    const res = await fetch(
-      "https://ahconnect.automaticheating.com.au/api/v1/W3fZovDPT4Au9WuhnSar/telemetry",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      }
-    );
+    const res = await fetch(TB_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
 
     if (!res.ok) {
-      throw new Error("Sync failed");
+      throw new Error(`Sync failed with status ${res.status}`);
     }
   }
 
-  setLogs((prev) =>
-    prev.map((item) => ({
-      ...item,
-      synced: true,
-    }))
-  );
-}
-  return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#0b1413",
-        color: "white",
-        padding: "24px",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "900px",
-          margin: "0 auto",
-          background: "#12201e",
-          border: "1px solid #223533",
-          borderRadius: "20px",
-          padding: "24px",
-        }}
-      >
-        <h1 style={{ marginTop: 0 }}>Project Logu</h1>
-        <p style={{ color: "#b7c7c4" }}>Simple work logger demo</p>
+  async function handleSync() {
+    const itemsToSync = logs.filter(
+      (item) => item.syncStatus === "pending" || item.syncStatus === "failed"
+    );
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "14px",
-            marginTop: "20px",
-          }}
-        >
+    if (itemsToSync.length === 0) {
+      setBannerMessage("Nothing to sync.");
+      return;
+    }
+
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (const item of itemsToSync) {
+      try {
+        await syncOneItem(item);
+
+        setLogs((prev) =>
+          prev.map((log) =>
+            log.id === item.id
+              ? {
+                  ...log,
+                  syncStatus: "synced",
+                  syncMessage: "Synced successfully",
+                }
+              : log
+          )
+        );
+
+        successCount += 1;
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unknown sync error";
+
+        setLogs((prev) =>
+          prev.map((log) =>
+            log.id === item.id
+              ? {
+                  ...log,
+                  syncStatus: "failed",
+                  syncMessage: message,
+                }
+              : log
+          )
+        );
+
+        failedCount += 1;
+      }
+    }
+
+    if (failedCount === 0) {
+      setBannerMessage(`${successCount} log(s) synced successfully.`);
+    } else {
+      setBannerMessage(
+        `${successCount} synced, ${failedCount} failed. Retry failed logs.`
+      );
+    }
+  }
+
+  function getSyncBadgeClass(status: SyncStatus) {
+    if (status === "pending") return styles.badgePending;
+    if (status === "syncing") return styles.badgeSyncing;
+    if (status === "synced") return styles.badgeSynced;
+    return styles.badgeFailed;
+  }
+
+  return (
+    <main className={styles.page}>
+      <div className={styles.card}>
+        <h1 className={styles.title}>Project Logu</h1>
+        <p className={styles.subtitle}>Work logger with sync tracking</p>
+
+        <div className={styles.formGrid}>
           <div>
-            <label>Full Name</label>
-            <input
+            <label className={styles.label}>Full Name *</label>
+            <select
               value={fullname}
-              onChange={(e) => setfullname(e.target.value)}
-              style={inputStyle}
-            />
+              onChange={(e) => setFullname(e.target.value)}
+              disabled={isWorking}
+              className={styles.input}
+            >
+              <option value="">Select full name</option>
+              {FULL_NAME_OPTIONS.filter(Boolean).map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
-            <label>Job ID</label>
+            <label className={styles.label}>Job ID *</label>
             <input
               value={jobId}
               onChange={(e) => setJobId(e.target.value)}
-              style={inputStyle}
+              disabled={isWorking}
+              className={styles.input}
             />
           </div>
 
           <div>
-            <label>Location</label>
+            <label className={styles.label}>Role *</label>
+            <input
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              disabled={isWorking}
+              placeholder="Plumber / Technician / Apprentice"
+              className={styles.input}
+            />
+          </div>
+
+          <div>
+            <label className={styles.label}>Location *</label>
             <input
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              style={inputStyle}
-            />
-          </div>
-
-          <div>
-            <label>Short note</label>
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              style={inputStyle}
-            />
-          </div>
-
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label>Description</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              style={textareaStyle}
+              disabled={isWorking}
+              className={styles.input}
             />
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            gap: "12px",
-            marginTop: "20px",
-            flexWrap: "wrap",
-          }}
-        >
-          <button onClick={handleStart} style={startButtonStyle}>
+        <div className={styles.buttonRow}>
+          <button
+            onClick={handleStart}
+            disabled={!canStart}
+            className={`${styles.button} ${styles.startButton}`}
+          >
             Start
           </button>
 
-          <button onClick={handleBreak} style={breakButtonStyle}>
+          <button
+            onClick={handleBreak}
+            disabled={!canBreak}
+            className={`${styles.button} ${styles.breakButton}`}
+          >
             {isOnBreak ? "End break" : "Break"}
           </button>
 
-          <button onClick={handleStop} style={stopButtonStyle}>
+          <button
+            onClick={handleStop}
+            disabled={!canStop}
+            className={`${styles.button} ${styles.stopButton}`}
+          >
             Stop
           </button>
-        <button onClick={handleSync} style={stopButtonStyle}>
-  Sync
-</button> 
-       </div>
 
-        <div
-          style={{
-            marginTop: "24px",
-            padding: "16px",
-            borderRadius: "14px",
-            background: "#0d1817",
-            border: "1px solid #223533",
-          }}
-        >
-          <strong>Status:</strong>{" "}
-          {isOnBreak ? "On break" : isWorking ? "Working" : "Idle"}
-          <div style={{ marginTop: "10px", color: "#b7c7c4" }}>
-            {fullname} · {jobId} · {location}
-          </div>
+          <button
+            onClick={handleSync}
+            className={`${styles.button} ${styles.syncButton}`}
+          >
+            Sync
+          </button>
+        </div>
+
+<div className={styles.descriptionBlock}>
+  <label className={styles.label}>Description {isWorking ? "*" : ""}</label>
+  <textarea
+    value={description}
+    onChange={(e) => setDescription(e.target.value)}
+    disabled={!isWorking}
+    placeholder={
+      isWorking
+        ? "Enter work description before stopping"
+        : "Description becomes available after Start"
+    }
+    className={styles.textarea}
+  />
+</div>
+
+<div className={styles.statusCard}>
+  <strong>Status:</strong> {getWorkingStatusText()}
+  <div className={styles.statusText}>Pending sync: {pendingCount}</div>
+  {bannerMessage && <div className={styles.banner}>{bannerMessage}</div>}
+</div>
+        <div className={styles.logsSection}>
+          <h2 className={styles.logsTitle}>Saved Logs</h2>
+
+          {logs.length === 0 ? (
+            <div className={styles.emptyState}>No logs yet.</div>
+          ) : (
+            <div className={styles.logsGrid}>
+              {logs.map((item) => {
+                const safeStatus = item.syncStatus ?? "pending";
+                return (
+                  <div key={item.id} className={styles.logCard}>
+                    <div className={styles.logTop}>
+                      <div className={styles.logHeading}>
+                        {item.fullname} · {item.jobId}
+                      </div>
+                      <span
+                        className={`${styles.badge} ${getSyncBadgeClass(safeStatus)}`}
+                      >
+                        {safeStatus.toUpperCase()}
+                      </span>
+                    </div>
+
+                    <div className={styles.logMeta}>
+                      {item.role} · {item.location}
+                    </div>
+
+                    <div className={styles.logDescription}>
+                      <strong>Description:</strong> {item.description}
+                    </div>
+
+                    <div className={styles.logStats}>
+                      Worked: {item.workedMinutes} min · Break: {item.breakMinutes} min
+                    </div>
+
+                    <div className={styles.logMessage}>
+                      {item.syncMessage ?? "Waiting to sync"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </main>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  height: "44px",
-  marginTop: "6px",
-  borderRadius: "12px",
-  border: "1px solid #2a403d",
-  background: "#0d1817",
-  color: "white",
-  padding: "0 12px",
-  boxSizing: "border-box",
-};
-
-const textareaStyle: React.CSSProperties = {
-  width: "100%",
-  minHeight: "100px",
-  marginTop: "6px",
-  borderRadius: "12px",
-  border: "1px solid #2a403d",
-  background: "#0d1817",
-  color: "white",
-  padding: "12px",
-  boxSizing: "border-box",
-};
-
-const startButtonStyle: React.CSSProperties = {
-  height: "48px",
-  padding: "0 18px",
-  borderRadius: "12px",
-  border: "none",
-  background: "#53BC7B",
-  color: "#081110",
-  fontWeight: 700,
-  cursor: "pointer",
-};
-
-const breakButtonStyle: React.CSSProperties = {
-  height: "48px",
-  padding: "0 18px",
-  borderRadius: "12px",
-  border: "none",
-  background: "#f2d7a1",
-  color: "#081110",
-  fontWeight: 700,
-  cursor: "pointer",
-};
-
-const stopButtonStyle: React.CSSProperties = {
-  height: "48px",
-  padding: "0 18px",
-  borderRadius: "12px",
-  border: "none",
-  background: "#ffffff",
-  color: "#081110",
-  fontWeight: 700,
-  cursor: "pointer",
-};

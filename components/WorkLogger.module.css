@@ -1,66 +1,245 @@
-.shell {
+.page {
   min-height: 100vh;
-  display: grid;
-  place-items: center;
   background: linear-gradient(180deg, #102624 0%, #081110 100%);
-  padding: 24px;
+  padding: 32px 16px;
 }
 
 .card {
   width: 100%;
-  max-width: 520px;
+  max-width: 780px;
+  margin: 0 auto;
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 24px;
   padding: 24px;
+  color: #ffffff;
   backdrop-filter: blur(14px);
 }
 
 .title {
   font-size: 28px;
-  font-weight: 700;
-  margin-bottom: 20px;
-  color: white;
+  margin: 0 0 8px 0;
+}
+
+.subtitle {
+  margin: 0;
+  color: #b7c7c4;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid #2a403d;
+  background: #0d1817;
+  color: #ffffff;
+  box-sizing: border-box;
+  outline: none;
 }
 
 .input {
-  width: 100%;
-  height: 48px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.2);
-  color: white;
-  padding: 0 14px;
-  margin-bottom: 12px;
+  height: 44px;
+  padding: 0 12px;
 }
 
-.actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.textarea {
+  min-height: 110px;
+  padding: 12px;
+  resize: vertical;
+}
+
+.input:disabled,
+.textarea:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.buttonRow {
+  display: flex;
   gap: 12px;
-  margin-top: 8px;
+  margin-top: 20px;
+  flex-wrap: wrap;
 }
 
-.start,
-.stop {
-  height: 54px;
-  border: 0;
-  border-radius: 16px;
+.button {
+  height: 48px;
+  padding: 0 18px;
+  border-radius: 12px;
+  border: none;
   font-weight: 700;
   cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.start {
+.button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.startButton {
   background: #53bc7b;
   color: #081110;
 }
 
-.stop {
-  background: white;
+.breakButton {
+  background: #f2d7a1;
   color: #081110;
 }
 
-.status {
+.stopButton {
+  background: #ffffff;
+  color: #081110;
+}
+
+.syncButton {
+  background: #0d1817;
+  color: #ffffff;
+  border: 1px solid #2a403d;
+}
+
+.statusCard {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 16px;
+  background: #0d1817;
+  border: 1px solid #2d4642;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.statusText {
+  margin-top: 8px;
+  color: #b7c7c4;
+}
+
+.banner {
+  margin-top: 8px;
+  color: #d9cdc7;
+}
+
+.descriptionBlock {
   margin-top: 16px;
-  color: rgba(255, 255, 255, 0.75);
+}
+
+.logsSection {
+  margin-top: 28px;
+}
+
+.logsTitle {
+  font-size: 20px;
+  margin: 0 0 12px 0;
+}
+
+.emptyState {
+  padding: 16px;
+  border-radius: 14px;
+  background: #0d1817;
+  border: 1px solid #223533;
+  color: #b7c7c4;
+}
+
+.logsGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.logCard {
+  padding: 16px;
+  border-radius: 16px;
+  background: #0d1817;
+  border: 1px solid #223533;
+}
+
+.logTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.logHeading {
+  font-weight: 700;
+}
+
+.logMeta {
+  margin-top: 8px;
+  color: #b7c7c4;
+}
+
+.logDescription {
+  margin-top: 8px;
+}
+
+.logStats {
+  margin-top: 8px;
+  color: #d9cdc7;
+}
+
+.logMessage {
+  margin-top: 8px;
+  color: #b7c7c4;
+  font-size: 13px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.badgePending {
+  background: #2d2415;
+  color: #f2d7a1;
+}
+
+.badgeSyncing {
+  background: #1c2e38;
+  color: #b2dfdc;
+}
+
+.badgeSynced {
+  background: #163223;
+  color: #53bc7b;
+}
+
+.badgeFailed {
+  background: #381b1b;
+  color: #ff9b9b;
+}
+
+@media (max-width: 700px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 18px;
+  }
+
+  .buttonRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
 }
