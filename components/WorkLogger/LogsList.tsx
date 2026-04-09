@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { formatDateTime } from "@/lib/workUtils";
 import type { LogItem } from "@/types/work";
-import styles from "./WorkLogger.module.css";
+import styles from "./LogsList.module.css";
 
 type LogsListProps = {
   logs: LogItem[];

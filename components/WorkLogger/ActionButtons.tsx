@@ -1,4 +1,4 @@
-import styles from "./WorkLogger.module.css";
+import styles from "./ActionButtons.module.css";
 
 type ActionButtonsProps = {
   isOnBreak: boolean;

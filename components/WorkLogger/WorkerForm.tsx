@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import styles from "./WorkLogger.module.css";
+import styles from "./WorkerForm.module.css";
 
 type WorkerFormProps = {
   fullNameOptions: string[];

@@ -2,7 +2,7 @@ import ActionButtons from "./ActionButtons";
 import LogsList from "./LogsList";
 import WorkerForm from "./WorkerForm";
 import type { WorkLoggerState } from "@/hooks/useWorkLogger";
-import styles from "./WorkLogger.module.css";
+import styles from "./WorkLoggerView.module.css";
 
 export default function WorkLoggerView(props: WorkLoggerState) {
   const pillClass = props.isOnBreak
