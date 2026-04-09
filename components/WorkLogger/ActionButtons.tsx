@@ -32,12 +32,17 @@ export default function ActionButtons({
   const pendingCount = Math.max(0, unsyncedCount - failedCount);
 
   let syncText = "All logs synced";
+  let syncToneClass = styles.syncOk;
+
   if (pendingCount > 0 && failedCount > 0) {
     syncText = `${pendingCount} pending • ${failedCount} failed`;
+    syncToneClass = styles.syncWarn;
   } else if (pendingCount > 0) {
     syncText = `${pendingCount} pending`;
+    syncToneClass = styles.syncWarn;
   } else if (failedCount > 0) {
     syncText = `${failedCount} failed`;
+    syncToneClass = styles.syncFail;
   }
 
   return (
@@ -45,27 +50,29 @@ export default function ActionButtons({
       <div className={styles.primaryActions}>
         <button
           type="button"
+          className={`${styles.actionButton} ${styles.startButton}`}
           onClick={handleStart}
           disabled={!canStart}
-          className={`${styles.actionButton} ${styles.startButton}`}
         >
           Start
         </button>
 
         <button
           type="button"
+          className={`${styles.actionButton} ${
+            isOnBreak ? styles.resumeButton : styles.breakButton
+          }`}
           onClick={handleBreak}
           disabled={!canBreak}
-          className={`${styles.actionButton} ${styles.midButton}`}
         >
           {isOnBreak ? "Resume" : "Break"}
         </button>
 
         <button
           type="button"
+          className={`${styles.actionButton} ${styles.finishButton}`}
           onClick={handleStop}
           disabled={!canStop}
-          className={`${styles.actionButton} ${styles.finishButton}`}
         >
           Finish
         </button>
@@ -74,23 +81,24 @@ export default function ActionButtons({
       <div className={styles.utilityRow}>
         <button
           type="button"
+          className={styles.clearButton}
           onClick={handleClearAll}
           disabled={!canClearAll}
-          className={styles.clearButton}
         >
           Clear All
         </button>
 
-        <div className={styles.syncGroup}>
-          <button
-            type="button"
-            onClick={handleSync}
-            className={styles.syncButton}
-          >
-            Sync
-          </button>
+        <button
+          type="button"
+          className={styles.syncButton}
+          onClick={handleSync}
+        >
+          Sync
+        </button>
 
-          <span className={styles.syncStatus}>Sync status: {syncText}</span>
+        <div className={`${styles.syncStatusBox} ${syncToneClass}`}>
+          <span className={styles.syncStatusLabel}>Sync status</span>
+          <span className={styles.syncStatusValue}>{syncText}</span>
         </div>
       </div>
     </div>

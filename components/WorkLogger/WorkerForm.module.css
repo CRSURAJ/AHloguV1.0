@@ -1,38 +1,42 @@
-.formFields {
-  width: 100%;
+.formWrap {
+  display: grid;
+  gap: 18px;
 }
 
 .fieldGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px 16px;
 }
 
 .field {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 8px;
 }
 
-.fieldFull {
-  grid-column: 1 / -1;
-}
-
 .label {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: rgba(238, 247, 243, 0.95);
+  font-size: 13px;
+  font-weight: 700;
+  color: #eef7f3;
+  line-height: 1.2;
 }
 
 .input,
-.textarea {
+.textarea,
+.customSelectButton {
   width: 100%;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(154, 200, 184, 0.18);
-  background: rgba(5, 14, 13, 0.52);
-  color: var(--text);
+  border-radius: 16px;
+  border: 1px solid rgba(83, 188, 123, 0.16);
+  background: rgba(1, 18, 17, 0.58);
+  color: #eef7f3;
+  font-size: 15px;
+  font-weight: 500;
   outline: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
 }
 
 .input {
@@ -40,47 +44,153 @@
   padding: 0 14px;
 }
 
+.input::placeholder,
+.textarea::placeholder,
+.placeholderState .customSelectText {
+  color: rgba(238, 247, 243, 0.3);
+}
+
+.input:focus,
+.textarea:focus,
+.customSelectButton:focus {
+  border-color: rgba(83, 188, 123, 0.45);
+  box-shadow: 0 0 0 3px rgba(83, 188, 123, 0.14);
+}
+
+.input:disabled,
+.textarea:disabled,
+.customSelectButton:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
 .textareaWrap {
   position: relative;
 }
 
 .textarea {
-  min-height: 126px;
-  padding: 14px 14px 34px;
+  min-height: 128px;
   resize: vertical;
-}
-
-.input::placeholder,
-.textarea::placeholder {
-  color: rgba(238, 247, 243, 0.34);
-}
-
-.input:focus,
-.textarea:focus {
-  border-color: rgba(83, 188, 123, 0.5);
-  box-shadow: 0 0 0 3px rgba(83, 188, 123, 0.1);
-}
-
-.input:disabled,
-.textarea:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.input option {
-  color: #111111;
+  padding: 14px 14px 34px;
 }
 
 .charCount {
   position: absolute;
-  right: 12px;
-  bottom: 10px;
-  font-size: 0.82rem;
-  color: rgba(238, 247, 243, 0.55);
+  right: 14px;
+  bottom: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(238, 247, 243, 0.62);
+  pointer-events: none;
 }
 
-@media (max-width: 820px) {
+/* Custom dropdown */
+.customSelectWrap {
+  position: relative;
+}
+
+.customSelectWrapOpen {
+  z-index: 20;
+}
+
+.customSelectButton {
+  min-height: 52px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.customSelectButton:hover:not(:disabled) {
+  border-color: rgba(83, 188, 123, 0.28);
+}
+
+.customSelectText {
+  display: block;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hasValue .customSelectText {
+  color: #eef7f3;
+}
+
+.chevron {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: rgba(238, 247, 243, 0.72);
+  transition: transform 0.2s ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.optionsPanel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid rgba(178, 223, 220, 0.12);
+  background: #11302d;
+  box-shadow:
+    0 18px 35px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  padding: 8px;
+}
+
+.optionItem {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #eef7f3;
+  text-align: left;
+  font-size: 15px;
+  font-weight: 500;
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.optionItem:hover {
+  background: rgba(178, 223, 220, 0.10);
+}
+
+.optionSelected {
+  background: rgba(178, 223, 220, 0.15);
+  color: #ffffff;
+}
+.optionEmpty {
+  padding: 12px 14px;
+  font-size: 14px;
+  color: rgba(238, 247, 243, 0.58);
+}
+
+@media (max-width: 980px) {
   .fieldGrid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .fieldGrid {
+    gap: 14px;
+  }
+
+  .input,
+  .customSelectButton {
+    min-height: 50px;
+  }
+
+  .textarea {
+    min-height: 116px;
   }
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { clearLogs, loadLogs, saveLogs } from "@/lib/workStorage";
 import { getWorkingStatusText, minutesBetween } from "@/lib/workUtils";
@@ -11,36 +12,30 @@ export const FULL_NAME_OPTIONS = ["", "Suraj", "Name 2", "Name 3"];
 
 export type WorkLoggerState = {
   fullname: string;
-  setFullname: React.Dispatch<React.SetStateAction<string>>;
+  setFullname: Dispatch<SetStateAction<string>>;
   jobId: string;
-  setJobId: React.Dispatch<React.SetStateAction<string>>;
+  setJobId: Dispatch<SetStateAction<string>>;
   location: string;
-  setLocation: React.Dispatch<React.SetStateAction<string>>;
+  setLocation: Dispatch<SetStateAction<string>>;
   role: string;
-  setRole: React.Dispatch<React.SetStateAction<string>>;
+  setRole: Dispatch<SetStateAction<string>>;
   description: string;
-  setDescription: React.Dispatch<React.SetStateAction<string>>;
-
+  setDescription: Dispatch<SetStateAction<string>>;
   isWorking: boolean;
   isOnBreak: boolean;
   breakMinutes: number;
   bannerMessage: string;
-
   logs: LogItem[];
   expandedLogId: number | null;
-
   canStart: boolean;
   canBreak: boolean;
   canStop: boolean;
   canClearAll: boolean;
-
   unsyncedCount: number;
   syncedCount: number;
   failedCount: number;
-
   workingStatusText: string;
   fullNameOptions: string[];
-
   handleStart: () => void;
   handleBreak: () => void;
   handleStop: () => void;
@@ -56,13 +51,11 @@ export function useWorkLogger(): WorkLoggerState {
   const [location, setLocation] = useState("");
   const [role, setRole] = useState("");
   const [description, setDescription] = useState("");
-
   const [isWorking, setIsWorking] = useState(false);
   const [isOnBreak, setIsOnBreak] = useState(false);
   const [startTime, setStartTime] = useState<string | null>(null);
   const [breakStartTime, setBreakStartTime] = useState<string | null>(null);
   const [breakMinutes, setBreakMinutes] = useState(0);
-
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [bannerMessage, setBannerMessage] = useState("");
   const [expandedLogId, setExpandedLogId] = useState<number | null>(null);
@@ -86,7 +79,7 @@ export function useWorkLogger(): WorkLoggerState {
     location.trim() !== "";
 
   const canBreak = isWorking;
-  const canStop = isWorking && description.trim() !== "";
+  const canStop = isWorking && !isOnBreak && description.trim() !== "";
 
   const unsyncedCount = useMemo(
     () => logs.filter((item) => item.syncStatus !== "synced").length,
@@ -132,7 +125,7 @@ export function useWorkLogger(): WorkLoggerState {
     setStartTime(now);
     setBreakStartTime(null);
     setBreakMinutes(0);
-    setBannerMessage("Work started. Complete description before stopping.");
+    setBannerMessage("Work started. Add description before finishing.");
   }
 
   function handleBreak() {
@@ -143,7 +136,7 @@ export function useWorkLogger(): WorkLoggerState {
     if (!isOnBreak) {
       setIsOnBreak(true);
       setBreakStartTime(now);
-      setBannerMessage("Break started.");
+      setBannerMessage("Break started. Resume work before finishing the log.");
       return;
     }
 
@@ -154,27 +147,25 @@ export function useWorkLogger(): WorkLoggerState {
 
     setIsOnBreak(false);
     setBreakStartTime(null);
-    setBannerMessage("Break ended.");
+    setBannerMessage("Break ended. Add description, then finish the log.");
   }
 
   function handleStop() {
     if (!isWorking || !startTime) return;
 
+    if (isOnBreak) {
+      setBannerMessage("Resume work before finishing the log.");
+      return;
+    }
+
     if (description.trim() === "") {
-      setBannerMessage("Description is required before stopping.");
+      setBannerMessage("Description is required before finishing.");
       return;
     }
 
     const stopTime = new Date().toISOString();
-
-    let finalBreakMinutes = breakMinutes;
-
-    if (isOnBreak && breakStartTime) {
-      finalBreakMinutes += minutesBetween(breakStartTime, stopTime);
-    }
-
     const totalMinutes = minutesBetween(startTime, stopTime);
-    const workedMinutes = Math.max(0, totalMinutes - finalBreakMinutes);
+    const workedMinutes = Math.max(0, totalMinutes - breakMinutes);
 
     const logItem: LogItem = {
       id: Date.now(),
@@ -186,7 +177,7 @@ export function useWorkLogger(): WorkLoggerState {
       description,
       startedAt: startTime,
       stoppedAt: stopTime,
-      breakMinutes: finalBreakMinutes,
+      breakMinutes,
       workedMinutes,
       syncStatus: "pending",
       syncMessage: "Waiting to sync",
@@ -199,7 +190,7 @@ export function useWorkLogger(): WorkLoggerState {
     setBreakStartTime(null);
     setBreakMinutes(0);
     setDescription("");
-    setBannerMessage("Work stopped. Log saved as pending.");
+    setBannerMessage("Work finished. Log saved as pending.");
   }
 
   async function syncOneItem(item: LogItem) {
@@ -344,27 +335,21 @@ export function useWorkLogger(): WorkLoggerState {
     setRole,
     description,
     setDescription,
-
     isWorking,
     isOnBreak,
     breakMinutes,
     bannerMessage,
-
     logs,
     expandedLogId,
-
     canStart,
     canBreak,
     canStop,
     canClearAll,
-
     unsyncedCount,
     syncedCount,
     failedCount,
-
     workingStatusText,
     fullNameOptions: FULL_NAME_OPTIONS,
-
     handleStart,
     handleBreak,
     handleStop,

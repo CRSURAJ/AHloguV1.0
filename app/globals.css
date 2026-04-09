@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #071211;
-  --bg-soft: #091816;
-  --panel: rgba(255, 255, 255, 0.035);
-  --panel-strong: rgba(3, 10, 9, 0.42);
-  --border: rgba(147, 197, 181, 0.18);
-  --border-soft: rgba(154, 200, 184, 0.12);
+  --bg: #085153;
+  --bg-soft: #085153;
+  --panel: #11302d;
+  --panel-strong: #11302d;
+  --border: rgba(178, 223, 220, 0.18);
+  --border-soft: rgba(178, 223, 220, 0.12);
   --text: #eef7f3;
   --muted: rgba(238, 247, 243, 0.66);
   --muted-2: rgba(238, 247, 243, 0.52);
@@ -19,9 +19,8 @@
   --radius-xl: 24px;
   --radius-lg: 18px;
   --radius-md: 14px;
-  --shadow-lg: 0 18px 45px rgba(0, 0, 0, 0.26);
+  --shadow-lg: 0 18px 45px rgba(0, 0, 0, 0.28);
 }
-
 * {
   box-sizing: border-box;
 }
@@ -31,11 +30,15 @@ body {
   margin: 0;
   padding: 0;
 }
-
+html {
+  font-size: 16px;
+}
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
 button,

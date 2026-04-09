@@ -2,23 +2,30 @@
   min-height: 100vh;
   padding: 28px 16px 48px;
   color: var(--text);
-  background:
-    radial-gradient(circle at top left, rgba(83, 188, 123, 0.12), transparent 26%),
-    radial-gradient(circle at bottom right, rgba(17, 48, 45, 0.45), transparent 22%),
-    linear-gradient(180deg, #071211 0%, #091816 48%, #07110f 100%);
+  background: #085153;
 }
 
 .shell {
-  width: min(1080px, 100%);
+  width: min(860px, 100%);
   margin: 0 auto;
+}
+
+.outerFrame {
+  border-radius: 30px;
+  padding: 22px;
+  background: rgba(17, 48, 45, 0.88);
+  border: 1px solid rgba(178, 223, 220, 0.14);
+  box-shadow:
+    0 22px 50px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(4px);
 }
 
 .topHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
+  justify-content: flex-start;
+  margin-bottom: 18px;
 }
 
 .brandWrap {
@@ -27,48 +34,35 @@
   gap: 14px;
 }
 
-.brandIcon,
-.headerGhostButton {
+.brandIcon {
   width: 48px;
   height: 48px;
   border-radius: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(133, 189, 171, 0.18);
-  background: rgba(255, 255, 255, 0.04);
-  color: #bdeed0;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
-}
-
-.brandText {
-  min-width: 0;
+  border: 1px solid rgba(178, 223, 220, 0.18);
+  background: #11302d;
+  color: #eef7f3;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
 }
 
 .pageTitle {
   margin: 0;
-  font-size: clamp(1.8rem, 3vw, 2.3rem);
+  font-size: 32px;
   font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.pageSubtitle {
-  margin: 4px 0 0;
-  color: rgba(238, 247, 243, 0.7);
-  font-size: 0.98rem;
-}
-
-.headerGhostButton {
-  cursor: pointer;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
 .entryCard {
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border);
-  background: var(--panel);
-  backdrop-filter: blur(8px);
+  border-radius: 24px;
+  border: 1px solid rgba(178, 223, 220, 0.14);
+  background: linear-gradient(180deg, rgba(7, 44, 41, 0.96), rgba(8, 40, 37, 0.96));
   box-shadow:
-    var(--shadow-lg),
+    0 14px 30px rgba(0, 0, 0, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.02);
   padding: 22px;
   margin-bottom: 18px;
@@ -84,14 +78,17 @@
 
 .cardTitle {
   margin: 0;
-  font-size: 1.7rem;
+  font-size: 24px;
   font-weight: 800;
+  line-height: 1.15;
 }
 
 .cardSubtitle {
   margin: 6px 0 0;
   color: var(--muted);
-  font-size: 0.98rem;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
 }
 
 .statusPill {
@@ -101,7 +98,7 @@
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
-  font-size: 0.92rem;
+  font-size: 13px;
   font-weight: 700;
   border: 1px solid transparent;
 }
@@ -136,27 +133,27 @@
     padding: 18px 12px 32px;
   }
 
-  .topHeader {
-    align-items: flex-start;
+  .outerFrame {
+    padding: 16px;
+    border-radius: 24px;
   }
 
-  .brandIcon,
-  .headerGhostButton {
+  .entryCard {
+    padding: 18px;
+    border-radius: 20px;
+  }
+
+  .brandIcon {
     width: 42px;
     height: 42px;
     border-radius: 14px;
   }
 
-  .entryCard {
-    border-radius: 20px;
-    padding: 18px;
-  }
-
   .pageTitle {
-    font-size: 1.7rem;
+    font-size: 28px;
   }
 
   .cardTitle {
-    font-size: 1.45rem;
+    font-size: 22px;
   }
 }
