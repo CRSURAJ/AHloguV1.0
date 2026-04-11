@@ -8,7 +8,7 @@ import type { LogItem, SyncStatus } from "@/types/work";
 
 const TB_URL = process.env.NEXT_PUBLIC_PROJECT_LOGU_SYNC_URL ?? "";
 
-export const FULL_NAME_OPTIONS = ["", "Suraj", "Name 2", "Name 3"];
+export const FULL_NAME_OPTIONS = ["", "Ryan Stephens", "Anita Draper", "Tyron Fourie"];
 
 export type WorkLoggerState = {
   fullname: string;
@@ -41,6 +41,7 @@ export type WorkLoggerState = {
   handleStop: () => void;
   handleSync: () => Promise<void>;
   handleClearAll: () => void;
+  handleDeleteLog: (id: number) => void;
   toggleExpandedLog: (id: number) => void;
   getSyncBadgeClass: (status: SyncStatus) => string;
 };
@@ -169,6 +170,7 @@ export function useWorkLogger(): WorkLoggerState {
 
     const logItem: LogItem = {
       id: Date.now(),
+      loguId: `logu-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       ts: new Date(stopTime).getTime(),
       fullname,
       jobId,
@@ -193,47 +195,46 @@ export function useWorkLogger(): WorkLoggerState {
     setBannerMessage("Work finished. Log saved as pending.");
   }
 
-  async function syncOneItem(item: LogItem) {
-    if (!TB_URL) {
-      throw new Error("Sync URL is not configured.");
-    }
-
-    setLogs((prev) =>
-      prev.map((log) =>
-        log.id === item.id
-          ? { ...log, syncStatus: "syncing", syncMessage: "Syncing..." }
-          : log
-      )
-    );
-
-    const payload = {
-      ts: item.ts,
-      values: {
-        fullname: item.fullname,
-        jobId: item.jobId,
-        location: item.location,
-        role: item.role,
-        description: item.description,
-        startedAt: item.startedAt,
-        stoppedAt: item.stoppedAt,
-        breakMinutes: item.breakMinutes,
-        workedMinutes: item.workedMinutes,
-      },
-    };
-
-    const res = await fetch(TB_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      throw new Error(`Sync failed with status ${res.status}`);
-    }
+async function syncOneItem(item: LogItem): Promise<number> {
+  if (!TB_URL) {
+    throw new Error("Sync URL is not configured.");
   }
 
+  setLogs((prev) =>
+    prev.map((log) =>
+      log.id === item.id
+        ? { ...log, syncStatus: "syncing", syncMessage: "Syncing..." }
+        : log
+    )
+  );
+
+  const payload = {
+    loguId: item.loguId,
+    fullname: item.fullname,
+    jobId: item.jobId,
+    location: item.location,
+    role: item.role,
+    description: item.description,
+    startedAt: item.startedAt,
+    stoppedAt: item.stoppedAt,
+    breakMinutes: item.breakMinutes,
+    workedMinutes: item.workedMinutes,
+  };
+
+  const res = await fetch(TB_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Sync failed with status ${res.status}`);
+  }
+
+  return Date.now();
+}
   async function handleSync() {
     const itemsToSync = logs.filter(
       (item) => item.syncStatus === "pending" || item.syncStatus === "failed"
@@ -247,43 +248,43 @@ export function useWorkLogger(): WorkLoggerState {
     let successCount = 0;
     let failCount = 0;
 
-    for (const item of itemsToSync) {
-      try {
-        await syncOneItem(item);
+for (const item of itemsToSync) {
+  try {
+    const syncedAt = await syncOneItem(item);
 
-        setLogs((prev) =>
-          prev.map((log) =>
-            log.id === item.id
-              ? {
-                  ...log,
-                  syncStatus: "synced",
-                  syncMessage: "Synced successfully",
-                }
-              : log
-          )
-        );
+    setLogs((prev) =>
+      prev.map((log) =>
+        log.id === item.id
+          ? {
+              ...log,
+              syncedAt,
+              syncStatus: "synced",
+              syncMessage: "Synced successfully",
+            }
+          : log
+      )
+    );
 
-        successCount += 1;
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Unknown sync error";
+    successCount += 1;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown sync error";
 
-        setLogs((prev) =>
-          prev.map((log) =>
-            log.id === item.id
-              ? {
-                  ...log,
-                  syncStatus: "failed",
-                  syncMessage: message,
-                }
-              : log
-          )
-        );
+    setLogs((prev) =>
+      prev.map((log) =>
+        log.id === item.id
+          ? {
+              ...log,
+              syncStatus: "failed",
+              syncMessage: message,
+            }
+          : log
+      )
+    );
 
-        failCount += 1;
-      }
-    }
-
+    failCount += 1;
+  }
+}
     if (failCount === 0) {
       setBannerMessage(`${successCount} log(s) synced successfully.`);
     } else {
@@ -308,6 +309,10 @@ export function useWorkLogger(): WorkLoggerState {
 
   function toggleExpandedLog(id: number) {
     setExpandedLogId((prev) => (prev === id ? null : id));
+  }
+  
+  function handleDeleteLog(id: number) {
+  setLogs((prev) => prev.filter((log) => log.id !== id));
   }
 
   function getSyncBadgeClass(status: SyncStatus) {
@@ -355,6 +360,7 @@ export function useWorkLogger(): WorkLoggerState {
     handleStop,
     handleSync,
     handleClearAll,
+    handleDeleteLog,
     toggleExpandedLog,
     getSyncBadgeClass,
   };

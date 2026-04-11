@@ -199,6 +199,35 @@
   font-size: 0.9rem;
 }
 
+.logActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.deleteButton {
+  border: 0;
+  background: transparent;
+  color: #e53935;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+
+.deleteButton:hover {
+  background: rgba(229, 57, 53, 0.12);
+  transform: scale(1.05);
+}
+
+.deleteButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 @media (max-width: 640px) {
   .logsCard {
     border-radius: 20px;

@@ -76,6 +76,7 @@ export default function WorkLoggerView(props: WorkLoggerState) {
             expandedLogId={props.expandedLogId}
             toggleExpandedLog={props.toggleExpandedLog}
             getSyncBadgeClass={props.getSyncBadgeClass}
+            onDelete={props.handleDeleteLog}
           />
         </div>
       </div>

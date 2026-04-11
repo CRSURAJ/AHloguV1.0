@@ -12,6 +12,7 @@ type LogsListProps = {
   getSyncBadgeClass: (
     status: "pending" | "syncing" | "synced" | "failed"
   ) => string;
+  onDelete: (id: number) => void;
 };
 
 export default function LogsList({
@@ -19,6 +20,7 @@ export default function LogsList({
   expandedLogId,
   toggleExpandedLog,
   getSyncBadgeClass,
+  onDelete,
 }: LogsListProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -58,23 +60,54 @@ export default function LogsList({
                 return (
                   <article key={item.id} className={styles.logItem}>
                     <div className={styles.logTop}>
-                      <div className={styles.logIdentity}>
-                        <div className={styles.logTitle}>
-                          {item.fullname} · {item.jobId}
-                        </div>
-                        <div className={styles.logMeta}>
-                          {item.role} · {item.location}
-                        </div>
-                      </div>
+  <div className={styles.logIdentity}>
+    <div className={styles.logTitle}>
+      {item.fullname} · {item.jobId}
+    </div>
+    <div className={styles.logMeta}>
+      {item.role} · {item.location}
+    </div>
+  </div>
 
-                      <span
-                        className={`${styles.badge} ${
-                          styles[getSyncBadgeClass(item.syncStatus)]
-                        }`}
-                      >
-                        {item.syncStatus.toUpperCase()}
-                      </span>
-                    </div>
+  <div className={styles.logActions}>
+    <span
+      className={`${styles.badge} ${
+        styles[getSyncBadgeClass(item.syncStatus)]
+      }`}
+    >
+      {item.syncStatus.toUpperCase()}
+    </span>
+
+    <button
+      type="button"
+      className={styles.deleteButton}
+      onClick={() => {
+        const ok = window.confirm("Delete this log?");
+        if (ok) onDelete(item.id);
+      }}
+      aria-label={`Delete log for ${item.fullname}`}
+      title="Delete log"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        width="18"
+        height="18"
+      >
+        <path d="M3 6h18" />
+        <path d="M8 6V4h8v2" />
+        <path d="M19 6l-1 14H6L5 6" />
+        <path d="M10 11v6" />
+        <path d="M14 11v6" />
+      </svg>
+    </button>
+  </div>
+</div>
 
                     <div className={styles.metaChips}>
                       <span className={styles.metaChip}>
@@ -108,7 +141,9 @@ export default function LogsList({
                         {item.syncMessage || "Waiting to sync"}
                       </span>
                       <span className={styles.logMeta}>
-                        {formatDateTime(item.stoppedAt)}
+                        {item.syncStatus === "synced"
+  ? formatDateTime(new Date(item.ts).toISOString())
+  : formatDateTime(item.stoppedAt)}
                       </span>
                     </div>
                   </article>

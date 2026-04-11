@@ -2,7 +2,9 @@ export type SyncStatus = "pending" | "syncing" | "synced" | "failed";
 
 export type LogItem = {
   id: number;
+  loguId: string;
   ts: number;
+  syncedAt?: number;
   fullname: string;
   jobId: string;
   location: string;
