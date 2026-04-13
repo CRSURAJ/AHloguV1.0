@@ -2,23 +2,46 @@
 
 import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { clearLogs, loadLogs, saveLogs } from "@/lib/workStorage";
+import {
+  clearDraft,
+  clearLogs,
+  clearSession,
+  loadDraft,
+  loadLogs,
+  loadSession,
+  saveDraft,
+  saveLogs,
+  saveSession,
+} from "@/lib/workStorage";
 import { getWorkingStatusText, minutesBetween } from "@/lib/workUtils";
-import type { LogItem, SyncStatus } from "@/types/work";
+import type {
+  ActiveSession,
+  CurrentUser,
+  DraftState,
+  LogItem,
+  SyncStatus,
+} from "@/types/work";
 
 const TB_URL = process.env.NEXT_PUBLIC_PROJECT_LOGU_SYNC_URL ?? "";
 
-export const FULL_NAME_OPTIONS = ["", "Ryan Stephens", "Anita Draper", "Tyron Fourie"];
+// Replace this mock user with your real auth user later.
+const CURRENT_USER: CurrentUser = {
+  id: "suraj-dhungana",
+  fullName: "Suraj Dhungana",
+  role: "Technician",
+};
 
 export type WorkLoggerState = {
-  fullname: string;
-  setFullname: Dispatch<SetStateAction<string>>;
+  currentUserFullName: string;
+  handleSignOut: () => void;
   jobId: string;
   setJobId: Dispatch<SetStateAction<string>>;
   location: string;
   setLocation: Dispatch<SetStateAction<string>>;
   role: string;
   setRole: Dispatch<SetStateAction<string>>;
+  jobDocs: string;
+  setJobDocs: Dispatch<SetStateAction<string>>;
   description: string;
   setDescription: Dispatch<SetStateAction<string>>;
   isWorking: boolean;
@@ -26,7 +49,7 @@ export type WorkLoggerState = {
   breakMinutes: number;
   bannerMessage: string;
   logs: LogItem[];
-  expandedLogId: number | null;
+  expandedLogId: string | null;
   canStart: boolean;
   canBreak: boolean;
   canStop: boolean;
@@ -35,46 +58,153 @@ export type WorkLoggerState = {
   syncedCount: number;
   failedCount: number;
   workingStatusText: string;
-  fullNameOptions: string[];
   handleStart: () => void;
   handleBreak: () => void;
   handleStop: () => void;
   handleSync: () => Promise<void>;
   handleClearAll: () => void;
-  handleDeleteLog: (id: number) => void;
-  toggleExpandedLog: (id: number) => void;
+  handleDeleteLog: (id: string) => void;
+  toggleExpandedLog: (id: string) => void;
   getSyncBadgeClass: (status: SyncStatus) => string;
 };
 
+function makeUuid(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function useWorkLogger(): WorkLoggerState {
-  const [fullname, setFullname] = useState("");
-  const [jobId, setJobId] = useState("");
-  const [location, setLocation] = useState("");
-  const [role, setRole] = useState("");
-  const [description, setDescription] = useState("");
-  const [isWorking, setIsWorking] = useState(false);
-  const [isOnBreak, setIsOnBreak] = useState(false);
+  const currentUser = CURRENT_USER;
+
+  const [jobId, setJobId] = useState<string>("");
+  const [location, setLocation] = useState<string>("");
+  const [role, setRole] = useState<string>(currentUser.role);
+  const [jobDocs, setJobDocs] = useState<string>("");
+  const [description, setDescription] = useState<string>("");
+
+  const [isWorking, setIsWorking] = useState<boolean>(false);
+  const [isOnBreak, setIsOnBreak] = useState<boolean>(false);
   const [startTime, setStartTime] = useState<string | null>(null);
   const [breakStartTime, setBreakStartTime] = useState<string | null>(null);
-  const [breakMinutes, setBreakMinutes] = useState(0);
+  const [breakMinutes, setBreakMinutes] = useState<number>(0);
+
   const [logs, setLogs] = useState<LogItem[]>([]);
-  const [bannerMessage, setBannerMessage] = useState("");
-  const [expandedLogId, setExpandedLogId] = useState<number | null>(null);
-  const [isHydrated, setIsHydrated] = useState(false);
+  const [bannerMessage, setBannerMessage] = useState<string>("");
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState<boolean>(false);
 
   useEffect(() => {
-    setLogs(loadLogs());
+    const loadedLogs = loadLogs(currentUser.id);
+    const activeSession = loadSession(currentUser.id);
+    const draft = loadDraft(currentUser.id);
+
+    setLogs(loadedLogs);
+
+    if (activeSession?.isWorking) {
+      setJobId(activeSession.jobId);
+      setLocation(activeSession.location);
+      setRole(activeSession.role || currentUser.role);
+      setJobDocs(activeSession.jobDocs);
+      setDescription(activeSession.description);
+      setIsWorking(true);
+      setIsOnBreak(activeSession.isOnBreak);
+      setStartTime(activeSession.startTime);
+      setBreakStartTime(activeSession.breakStartTime);
+      setBreakMinutes(activeSession.breakMinutes);
+      setBannerMessage("Restored your active session from this device.");
+    } else if (draft) {
+      setJobId(draft.jobId);
+      setLocation(draft.location);
+      setRole(draft.role || currentUser.role);
+      setJobDocs(draft.jobDocs);
+      setDescription(draft.description);
+    }
+
     setIsHydrated(true);
-  }, []);
+  }, [currentUser.id, currentUser.role]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    saveLogs(logs);
-  }, [logs, isHydrated]);
+    saveLogs(currentUser.id, logs);
+  }, [currentUser.id, isHydrated, logs]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    if (isWorking) {
+      const session: ActiveSession = {
+        isWorking,
+        isOnBreak,
+        startTime,
+        breakStartTime,
+        breakMinutes,
+        jobId,
+        location,
+        role,
+        jobDocs,
+        description,
+      };
+
+      saveSession(currentUser.id, session);
+      return;
+    }
+
+    clearSession(currentUser.id);
+  }, [
+    breakMinutes,
+    breakStartTime,
+    currentUser.id,
+    description,
+    isHydrated,
+    isOnBreak,
+    isWorking,
+    jobDocs,
+    jobId,
+    location,
+    role,
+    startTime,
+  ]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    if (isWorking) return;
+
+    const draft: DraftState = {
+      jobId,
+      location,
+      role,
+      jobDocs,
+      description,
+    };
+
+    const hasMeaningfulDraft =
+      draft.jobId.trim() !== "" ||
+      draft.location.trim() !== "" ||
+      draft.role.trim() !== "" ||
+      draft.jobDocs.trim() !== "" ||
+      draft.description.trim() !== "";
+
+    if (hasMeaningfulDraft) {
+      saveDraft(currentUser.id, draft);
+    } else {
+      clearDraft(currentUser.id);
+    }
+  }, [
+    currentUser.id,
+    description,
+    isHydrated,
+    isWorking,
+    jobDocs,
+    jobId,
+    location,
+    role,
+  ]);
 
   const canStart =
     !isWorking &&
-    fullname.trim() !== "" &&
     jobId.trim() !== "" &&
     role.trim() !== "" &&
     location.trim() !== "";
@@ -103,11 +233,19 @@ export function useWorkLogger(): WorkLoggerState {
   const workingStatusText = getWorkingStatusText(isWorking, isOnBreak);
 
   function validateBeforeStart(): string {
-    if (fullname.trim() === "") return "Full name is required.";
     if (jobId.trim() === "") return "Job ID is required.";
     if (role.trim() === "") return "Role is required.";
     if (location.trim() === "") return "Location is required.";
     return "";
+  }
+
+  function resetEntryFields() {
+    setJobId("");
+    setLocation("");
+    setRole(currentUser.role);
+    setJobDocs("");
+    setDescription("");
+    clearDraft(currentUser.id);
   }
 
   function handleStart() {
@@ -169,13 +307,14 @@ export function useWorkLogger(): WorkLoggerState {
     const workedMinutes = Math.max(0, totalMinutes - breakMinutes);
 
     const logItem: LogItem = {
-      id: Date.now(),
-      loguId: `logu-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: makeUuid(),
+      loguId: makeUuid(),
       ts: new Date(stopTime).getTime(),
-      fullname,
+      fullname: currentUser.fullName,
       jobId,
       location,
       role,
+      jobDocs,
       description,
       startedAt: startTime,
       stoppedAt: stopTime,
@@ -191,51 +330,57 @@ export function useWorkLogger(): WorkLoggerState {
     setStartTime(null);
     setBreakStartTime(null);
     setBreakMinutes(0);
-    setDescription("");
+    resetEntryFields();
+    clearSession(currentUser.id);
     setBannerMessage("Work finished. Log saved as pending.");
   }
 
-async function syncOneItem(item: LogItem): Promise<number> {
-  if (!TB_URL) {
-    throw new Error("Sync URL is not configured.");
+  async function syncOneItem(item: LogItem): Promise<number> {
+    if (!TB_URL) {
+      throw new Error("Sync URL is not configured.");
+    }
+
+    setLogs((prev) =>
+      prev.map((log) =>
+        log.id === item.id
+          ? {
+              ...log,
+              syncStatus: "syncing",
+              syncMessage: "Syncing...",
+            }
+          : log
+      )
+    );
+
+    const payload = {
+      loguId: item.loguId,
+      fullname: item.fullname,
+      jobId: item.jobId,
+      location: item.location,
+      role: item.role,
+      description: item.description,
+      startedAt: item.startedAt,
+      stoppedAt: item.stoppedAt,
+      breakMinutes: item.breakMinutes,
+      workedMinutes: item.workedMinutes,
+    };
+
+    const res = await fetch(TB_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Sync failed with status ${res.status}`);
+    }
+
+    return Date.now();
   }
 
-  setLogs((prev) =>
-    prev.map((log) =>
-      log.id === item.id
-        ? { ...log, syncStatus: "syncing", syncMessage: "Syncing..." }
-        : log
-    )
-  );
-
-  const payload = {
-    loguId: item.loguId,
-    fullname: item.fullname,
-    jobId: item.jobId,
-    location: item.location,
-    role: item.role,
-    description: item.description,
-    startedAt: item.startedAt,
-    stoppedAt: item.stoppedAt,
-    breakMinutes: item.breakMinutes,
-    workedMinutes: item.workedMinutes,
-  };
-
-  const res = await fetch(TB_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Sync failed with status ${res.status}`);
-  }
-
-  return Date.now();
-}
-  async function handleSync() {
+  async function handleSync(): Promise<void> {
     const itemsToSync = logs.filter(
       (item) => item.syncStatus === "pending" || item.syncStatus === "failed"
     );
@@ -248,43 +393,44 @@ async function syncOneItem(item: LogItem): Promise<number> {
     let successCount = 0;
     let failCount = 0;
 
-for (const item of itemsToSync) {
-  try {
-    const syncedAt = await syncOneItem(item);
+    for (const item of itemsToSync) {
+      try {
+        const syncedAt = await syncOneItem(item);
 
-    setLogs((prev) =>
-      prev.map((log) =>
-        log.id === item.id
-          ? {
-              ...log,
-              syncedAt,
-              syncStatus: "synced",
-              syncMessage: "Synced successfully",
-            }
-          : log
-      )
-    );
+        setLogs((prev) =>
+          prev.map((log) =>
+            log.id === item.id
+              ? {
+                  ...log,
+                  syncedAt,
+                  syncStatus: "synced",
+                  syncMessage: "Synced successfully",
+                }
+              : log
+          )
+        );
 
-    successCount += 1;
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown sync error";
+        successCount += 1;
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unknown sync error";
 
-    setLogs((prev) =>
-      prev.map((log) =>
-        log.id === item.id
-          ? {
-              ...log,
-              syncStatus: "failed",
-              syncMessage: message,
-            }
-          : log
-      )
-    );
+        setLogs((prev) =>
+          prev.map((log) =>
+            log.id === item.id
+              ? {
+                  ...log,
+                  syncStatus: "failed",
+                  syncMessage: message,
+                }
+              : log
+          )
+        );
 
-    failCount += 1;
-  }
-}
+        failCount += 1;
+      }
+    }
+
     if (failCount === 0) {
       setBannerMessage(`${successCount} log(s) synced successfully.`);
     } else {
@@ -303,16 +449,27 @@ for (const item of itemsToSync) {
 
     setLogs([]);
     setExpandedLogId(null);
-    clearLogs();
+    clearLogs(currentUser.id);
     setBannerMessage("All saved logs cleared.");
   }
 
-  function toggleExpandedLog(id: number) {
+  function toggleExpandedLog(id: string) {
     setExpandedLogId((prev) => (prev === id ? null : id));
   }
-  
-  function handleDeleteLog(id: number) {
-  setLogs((prev) => prev.filter((log) => log.id !== id));
+
+  function handleDeleteLog(id: string) {
+    setLogs((prev) => prev.filter((log) => log.id !== id));
+    setExpandedLogId((prev) => (prev === id ? null : prev));
+  }
+
+  function handleSignOut() {
+    const confirmed = window.confirm(
+      "Real authentication is not wired in yet. This button is ready for your future sign-out flow.\n\nPress OK to continue."
+    );
+
+    if (!confirmed) return;
+
+    setBannerMessage("Replace handleSignOut() with your real auth sign-out later.");
   }
 
   function getSyncBadgeClass(status: SyncStatus) {
@@ -330,14 +487,16 @@ for (const item of itemsToSync) {
   }
 
   return {
-    fullname,
-    setFullname,
+    currentUserFullName: currentUser.fullName,
+    handleSignOut,
     jobId,
     setJobId,
     location,
     setLocation,
     role,
     setRole,
+    jobDocs,
+    setJobDocs,
     description,
     setDescription,
     isWorking,
@@ -354,7 +513,6 @@ for (const item of itemsToSync) {
     syncedCount,
     failedCount,
     workingStatusText,
-    fullNameOptions: FULL_NAME_OPTIONS,
     handleStart,
     handleBreak,
     handleStop,

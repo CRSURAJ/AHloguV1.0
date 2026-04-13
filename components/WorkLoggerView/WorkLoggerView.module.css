@@ -44,7 +44,11 @@
 .entryCard {
   border-radius: 24px;
   border: 1px solid rgba(178, 223, 220, 0.14);
-  background: linear-gradient(180deg, rgba(7, 44, 41, 0.96), rgba(8, 40, 37, 0.96));
+  background: linear-gradient(
+    180deg,
+    rgba(7, 44, 41, 0.96),
+    rgba(8, 40, 37, 0.96)
+  );
   box-shadow:
     0 14px 30px rgba(0, 0, 0, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.02);
@@ -57,7 +61,19 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
+}
+
+.headerText {
+  display: grid;
+  gap: 10px;
+}
+
+.headerMetaRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .cardTitle {
@@ -65,14 +81,39 @@
   font-size: 24px;
   font-weight: 500;
   line-height: 1.15;
-  color: #D9CDC7;
+  color: #d9cdc7;
 }
 
-.cardSubtitle {
-  margin: 6px 0 0;
-  color: var(--muted);
+.signOutButton {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(178, 223, 220, 0.18);
+  background: rgba(8, 34, 32, 0.75);
+  color: #eef7f3;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    filter 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.signOutButton:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+  border-color: rgba(83, 188, 123, 0.32);
+}
+
+.banner {
+  margin-bottom: 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(178, 223, 220, 0.12);
+  background: rgba(8, 34, 32, 0.68);
+  color: #eef7f3;
+  padding: 12px 14px;
   font-size: 14px;
-  font-weight: 500;
   line-height: 1.45;
 }
 
@@ -126,11 +167,6 @@
   .entryCard {
     padding: 18px;
     border-radius: 20px;
-  }
-
-
-  .pageTitle {
-    font-size: 28px;
   }
 
   .cardTitle {

@@ -7,12 +7,12 @@ import styles from "./LogsList.module.css";
 
 type LogsListProps = {
   logs: LogItem[];
-  expandedLogId: number | null;
-  toggleExpandedLog: (id: number) => void;
+  expandedLogId: string | null;
+  toggleExpandedLog: (id: string) => void;
   getSyncBadgeClass: (
     status: "pending" | "syncing" | "synced" | "failed"
   ) => string;
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void;
 };
 
 export default function LogsList({
@@ -25,30 +25,23 @@ export default function LogsList({
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <section className={styles.logsCard}>
+    <div className={styles.logsWrap}>
       <button
         type="button"
         className={styles.logsToggle}
         onClick={() => setIsOpen((prev) => !prev)}
       >
-        <div className={styles.logsTitleWrap}>
+        <div>
           <div className={styles.logsTitle}>Recent Logs</div>
-          <div className={styles.logsSubtitle}>
+          <div className={styles.logsCount}>
             {logs.length} saved log{logs.length === 1 ? "" : "s"}
           </div>
         </div>
-
-        <div
-          className={`${styles.chevron} ${
-            isOpen ? styles.chevronOpen : ""
-          }`}
-        >
-          ▾
-        </div>
+        <span className={styles.logsChevron}>{isOpen ? "▴" : "▾"}</span>
       </button>
 
       {isOpen && (
-        <div className={styles.logsBody}>
+        <div className={styles.logsPanel}>
           {logs.length === 0 ? (
             <div className={styles.emptyState}>No logs yet.</div>
           ) : (
@@ -57,79 +50,65 @@ export default function LogsList({
                 const isExpanded = expandedLogId === item.id;
                 const canExpand = (item.description ?? "").length > 90;
 
+                const displayDescription =
+                  canExpand && !isExpanded
+                    ? `${item.description.slice(0, 90)}…`
+                    : item.description || "No description";
+
+                const displayTimestamp =
+                  item.syncStatus === "synced" && item.syncedAt
+                    ? `Synced ${formatDateTime(
+                        new Date(item.syncedAt).toISOString()
+                      )}`
+                    : `Finished ${formatDateTime(item.stoppedAt)}`;
+
                 return (
-                  <article key={item.id} className={styles.logItem}>
-                    <div className={styles.logTop}>
-  <div className={styles.logIdentity}>
-    <div className={styles.logTitle}>
-      {item.fullname} · {item.jobId}
-    </div>
-    <div className={styles.logMeta}>
-      {item.role} · {item.location}
-    </div>
-  </div>
+                  <div key={item.id} className={styles.logCard}>
+                    <div className={styles.logHeader}>
+                      <div>
+                        <div className={styles.logTitle}>
+                          {item.fullname || "Unknown worker"} · {item.jobId}
+                        </div>
+                        <div className={styles.logMeta}>
+                          {item.role} · {item.location}
+                        </div>
+                      </div>
 
-  <div className={styles.logActions}>
-    <span
-      className={`${styles.badge} ${
-        styles[getSyncBadgeClass(item.syncStatus)]
-      }`}
-    >
-      {item.syncStatus.toUpperCase()}
-    </span>
+                      <div className={styles.logHeaderRight}>
+                        <span
+                          className={`${styles.syncBadge} ${styles[getSyncBadgeClass(item.syncStatus)]}`}
+                        >
+                          {item.syncStatus.toUpperCase()}
+                        </span>
 
-    <button
-      type="button"
-      className={styles.deleteButton}
-      onClick={() => {
-        const ok = window.confirm("Delete this log?");
-        if (ok) onDelete(item.id);
-      }}
-      aria-label={`Delete log for ${item.fullname}`}
-      title="Delete log"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        width="18"
-        height="18"
-      >
-        <path d="M3 6h18" />
-        <path d="M8 6V4h8v2" />
-        <path d="M19 6l-1 14H6L5 6" />
-        <path d="M10 11v6" />
-        <path d="M14 11v6" />
-      </svg>
-    </button>
-  </div>
-</div>
-
-                    <div className={styles.metaChips}>
-                      <span className={styles.metaChip}>
-                        Worked {item.workedMinutes} min
-                      </span>
-                      <span className={styles.metaChip}>
-                        Break {item.breakMinutes} min
-                      </span>
+                        <button
+                          type="button"
+                          className={styles.deleteButton}
+                          onClick={() => {
+                            const ok = window.confirm("Delete this log?");
+                            if (ok) onDelete(item.id);
+                          }}
+                          aria-label={`Delete log for ${item.fullname}`}
+                          title="Delete log"
+                        >
+                          ×
+                        </button>
+                      </div>
                     </div>
 
-                    <div
-                      className={`${styles.logDescription} ${
-                        isExpanded ? styles.logDescriptionExpanded : ""
-                      }`}
-                    >
-                      {item.description || "No description"}
+                    <div className={styles.logStats}>
+                      <span>Worked {item.workedMinutes} min</span>
+                      <span>Break {item.breakMinutes} min</span>
+                    </div>
+
+                    <div className={styles.logDescription}>
+                      {displayDescription}
                     </div>
 
                     {canExpand && (
                       <button
                         type="button"
-                        className={styles.linkButton}
+                        className={styles.expandButton}
                         onClick={() => toggleExpandedLog(item.id)}
                       >
                         {isExpanded ? "Show less" : "Show more"}
@@ -137,22 +116,16 @@ export default function LogsList({
                     )}
 
                     <div className={styles.logFooter}>
-                      <span className={styles.logMessage}>
-                        {item.syncMessage || "Waiting to sync"}
-                      </span>
-                      <span className={styles.logMeta}>
-                        {item.syncStatus === "synced"
-  ? formatDateTime(new Date(item.ts).toISOString())
-  : formatDateTime(item.stoppedAt)}
-                      </span>
+                      <span>{item.syncMessage || "Waiting to sync"}</span>
+                      <span>{displayTimestamp}</span>
                     </div>
-                  </article>
+                  </div>
                 );
               })}
             </div>
           )}
         </div>
       )}
-    </section>
+    </div>
   );
 }

@@ -1,6 +1,5 @@
 import { ActionButtons, LogsList, WorkerForm } from "@/components";
 import Image from "next/image";
-
 import type { WorkLoggerState } from "@/hooks/useWorkLogger";
 import styles from "./WorkLoggerView.module.css";
 
@@ -12,26 +11,38 @@ export default function WorkLoggerView(props: WorkLoggerState) {
       : styles.statusReady;
 
   return (
-    <main className={styles.page}>
+    <div className={styles.page}>
       <div className={styles.shell}>
         <div className={styles.outerFrame}>
-          <header className={styles.topHeader}>
-  <div className={styles.brandWrap}>
-    <Image
-      src="/AHlogu.png"
-      alt="AHlogu"
-      className={styles.logoImage}
-      width={260}
-      height={70}
-      priority
-    />
-  </div>
-</header>
+          <div className={styles.topHeader}>
+            <div className={styles.brandWrap}>
+              <Image
+                src="/AHlogu.png"
+                alt="AH LOGU"
+                width={180}
+                height={54}
+                className={styles.logoImage}
+                priority
+              />
+            </div>
+          </div>
 
-          <section className={styles.entryCard}>
+          <div className={styles.entryCard}>
             <div className={styles.cardHeader}>
-              <div>
-                <h2 className={styles.cardTitle}>New Log Entry</h2>
+              <div className={styles.headerText}>
+                <h2 className={styles.cardTitle}>
+                  Hi, {props.currentUserFullName}!
+                </h2>
+
+                <div className={styles.headerMetaRow}>
+                  <button
+                    type="button"
+                    className={styles.signOutButton}
+                    onClick={props.handleSignOut}
+                  >
+                    Sign out
+                  </button>
+                </div>
               </div>
 
               <div className={`${styles.statusPill} ${pillClass}`}>
@@ -39,16 +50,19 @@ export default function WorkLoggerView(props: WorkLoggerState) {
               </div>
             </div>
 
+            {props.bannerMessage ? (
+              <div className={styles.banner}>{props.bannerMessage}</div>
+            ) : null}
+
             <WorkerForm
-              fullNameOptions={props.fullNameOptions}
-              fullname={props.fullname}
-              setFullname={props.setFullname}
               jobId={props.jobId}
               setJobId={props.setJobId}
               role={props.role}
               setRole={props.setRole}
               location={props.location}
               setLocation={props.setLocation}
+              jobDocs={props.jobDocs}
+              setJobDocs={props.setJobDocs}
               description={props.description}
               setDescription={props.setDescription}
               isWorking={props.isWorking}
@@ -69,7 +83,7 @@ export default function WorkLoggerView(props: WorkLoggerState) {
               handleSync={props.handleSync}
               handleClearAll={props.handleClearAll}
             />
-          </section>
+          </div>
 
           <LogsList
             logs={props.logs}
@@ -80,6 +94,6 @@ export default function WorkLoggerView(props: WorkLoggerState) {
           />
         </div>
       </div>
-    </main>
+    </div>
   );
 }
