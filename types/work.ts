@@ -1,5 +1,8 @@
 export type SyncStatus = "pending" | "syncing" | "synced" | "failed";
 
+export type UserRole = "admin" | "user";
+export type CredentialType = "password" | "pin";
+
 export type LogItem = {
   id: string;
   loguId: string;
@@ -42,19 +45,36 @@ export type DraftState = {
 
 export type CurrentUser = {
   id: string;
+  username: string;
   fullName: string;
-  role: string;
+  role: UserRole;
+  credentialType: CredentialType;
+  mustChangeCredential: boolean;
 };
 
 export type OfflineUser = {
   id: string;
+  username: string;
   fullName: string;
-  role: string;
-  pinHash: string;
+  role: UserRole;
+  credentialType: CredentialType;
+  credentialHash: string;
+  credentialSalt: string;
+  mustChangeCredential: boolean;
   isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type LocalAuthSession = {
   userId: string;
   signedInAt: string;
+};
+
+export type CreateLocalUserInput = {
+  username: string;
+  fullName: string;
+  role: UserRole;
+  credentialType: CredentialType;
+  secret: string;
 };

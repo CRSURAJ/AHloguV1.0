@@ -1,25 +1,22 @@
 "use client";
 
 import Image from "next/image";
-import type { OfflineUser } from "@/types/work";
 import styles from "./LoginScreen.module.css";
 
 type LoginScreenProps = {
-  users: OfflineUser[];
-  selectedUserId: string;
-  setSelectedUserId: (value: string) => void;
-  pin: string;
-  setPin: (value: string) => void;
+  loginUsername: string;
+  setLoginUsername: (value: string) => void;
+  loginSecret: string;
+  setLoginSecret: (value: string) => void;
   authMessage: string;
   handleLogin: () => Promise<void>;
 };
 
 export default function LoginScreen({
-  users,
-  selectedUserId,
-  setSelectedUserId,
-  pin,
-  setPin,
+  loginUsername,
+  setLoginUsername,
+  loginSecret,
+  setLoginSecret,
   authMessage,
   handleLogin,
 }: LoginScreenProps) {
@@ -30,8 +27,8 @@ export default function LoginScreen({
           <Image
             src="/AHlogu.png"
             alt="AH LOGU"
-            width={180}
-            height={54}
+            width={220}
+            height={66}
             className={styles.logo}
             priority
           />
@@ -50,37 +47,34 @@ export default function LoginScreen({
           }}
         >
           <div className={styles.field}>
-            <label htmlFor="worker" className={styles.label}>
-              Worker
-            </label>
-
-            <select
-              id="worker"
-              className={styles.select}
-              value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
-            >
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.fullName} · {user.role}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className={styles.field}>
-            <label htmlFor="pin" className={styles.label}>
-              PIN
+            <label htmlFor="username" className={styles.label}>
+              Username
             </label>
 
             <input
-              id="pin"
+              id="username"
+              className={styles.input}
+              type="text"
+              value={loginUsername}
+              onChange={(e) => setLoginUsername(e.target.value)}
+              placeholder="Enter username"
+              autoComplete="username"
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label htmlFor="secret" className={styles.label}>
+              PIN / Password
+            </label>
+
+            <input
+              id="secret"
               className={styles.input}
               type="password"
-              inputMode="numeric"
-              placeholder="Enter PIN"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
+              value={loginSecret}
+              onChange={(e) => setLoginSecret(e.target.value)}
+              placeholder="Enter PIN or password"
+              autoComplete="current-password"
             />
           </div>
 
@@ -89,9 +83,15 @@ export default function LoginScreen({
           </button>
         </form>
 
+        <div className={styles.helpCard}>
+          <div className={styles.helpTitle}>Forgot PIN or password?</div>
+          <div className={styles.helpText}>
+            Ask the admin to reset your credential on this device.
+          </div>
+        </div>
+
         <p className={styles.note}>
-          Change the default users and PINs in <code>lib/localAuth.ts</code>
-          before real use.
+          Default first-time admin login: <code>admin</code> / <code>Admin1234!</code>
         </p>
       </div>
     </main>

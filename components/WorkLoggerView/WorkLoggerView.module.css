@@ -22,8 +22,6 @@
 }
 
 .logoImage {
-  width: auto;
-  height: auto;
   display: block;
   object-fit: contain;
 }
@@ -72,7 +70,7 @@
 .headerMetaRow {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
@@ -84,13 +82,11 @@
   color: #d9cdc7;
 }
 
+.secondaryButton,
 .signOutButton {
   min-height: 36px;
   padding: 0 14px;
   border-radius: 999px;
-  border: 1px solid rgba(178, 223, 220, 0.18);
-  background: rgba(8, 34, 32, 0.75);
-  color: #eef7f3;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -100,10 +96,22 @@
     border-color 0.16s ease;
 }
 
+.secondaryButton {
+  border: 1px solid rgba(178, 223, 220, 0.18);
+  background: rgba(8, 34, 32, 0.75);
+  color: #eef7f3;
+}
+
+.signOutButton {
+  border: 1px solid rgba(83, 188, 123, 0.22);
+  background: rgba(83, 188, 123, 0.1);
+  color: #d4fbe3;
+}
+
+.secondaryButton:hover,
 .signOutButton:hover {
   transform: translateY(-1px);
   filter: brightness(1.04);
-  border-color: rgba(83, 188, 123, 0.32);
 }
 
 .banner {

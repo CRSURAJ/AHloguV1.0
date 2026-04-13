@@ -5,6 +5,10 @@ import styles from "./WorkLoggerView.module.css";
 
 type WorkLoggerViewProps = WorkLoggerState & {
   onSignOut: () => void;
+  onOpenSecurity: () => void;
+  onOpenUserManagement: () => void;
+  canManageUsers: boolean;
+  securityLabel: string;
 };
 
 export default function WorkLoggerView(props: WorkLoggerViewProps) {
@@ -39,6 +43,24 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
                 </h2>
 
                 <div className={styles.headerMetaRow}>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={props.onOpenSecurity}
+                  >
+                    {props.securityLabel}
+                  </button>
+
+                  {props.canManageUsers ? (
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={props.onOpenUserManagement}
+                    >
+                      Manage Users
+                    </button>
+                  ) : null}
+
                   <button
                     type="button"
                     className={styles.signOutButton}
