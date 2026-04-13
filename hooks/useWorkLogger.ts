@@ -24,16 +24,8 @@ import type {
 
 const TB_URL = process.env.NEXT_PUBLIC_PROJECT_LOGU_SYNC_URL ?? "";
 
-// Replace this mock user with your real auth user later.
-const CURRENT_USER: CurrentUser = {
-  id: "suraj-dhungana",
-  fullName: "Suraj Dhungana",
-  role: "Technician",
-};
-
 export type WorkLoggerState = {
   currentUserFullName: string;
-  handleSignOut: () => void;
   jobId: string;
   setJobId: Dispatch<SetStateAction<string>>;
   location: string;
@@ -76,9 +68,7 @@ function makeUuid(): string {
   return `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function useWorkLogger(): WorkLoggerState {
-  const currentUser = CURRENT_USER;
-
+export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
   const [jobId, setJobId] = useState<string>("");
   const [location, setLocation] = useState<string>("");
   const [role, setRole] = useState<string>(currentUser.role);
@@ -202,6 +192,10 @@ export function useWorkLogger(): WorkLoggerState {
     location,
     role,
   ]);
+
+  useEffect(() => {
+    setRole(currentUser.role);
+  }, [currentUser.role]);
 
   const canStart =
     !isWorking &&
@@ -462,16 +456,6 @@ export function useWorkLogger(): WorkLoggerState {
     setExpandedLogId((prev) => (prev === id ? null : prev));
   }
 
-  function handleSignOut() {
-    const confirmed = window.confirm(
-      "Real authentication is not wired in yet. This button is ready for your future sign-out flow.\n\nPress OK to continue."
-    );
-
-    if (!confirmed) return;
-
-    setBannerMessage("Replace handleSignOut() with your real auth sign-out later.");
-  }
-
   function getSyncBadgeClass(status: SyncStatus) {
     switch (status) {
       case "pending":
@@ -488,7 +472,6 @@ export function useWorkLogger(): WorkLoggerState {
 
   return {
     currentUserFullName: currentUser.fullName,
-    handleSignOut,
     jobId,
     setJobId,
     location,

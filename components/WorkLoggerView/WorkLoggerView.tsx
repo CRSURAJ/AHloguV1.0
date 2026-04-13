@@ -3,7 +3,11 @@ import Image from "next/image";
 import type { WorkLoggerState } from "@/hooks/useWorkLogger";
 import styles from "./WorkLoggerView.module.css";
 
-export default function WorkLoggerView(props: WorkLoggerState) {
+type WorkLoggerViewProps = WorkLoggerState & {
+  onSignOut: () => void;
+};
+
+export default function WorkLoggerView(props: WorkLoggerViewProps) {
   const pillClass = props.isOnBreak
     ? styles.statusBreak
     : props.isWorking
@@ -38,7 +42,7 @@ export default function WorkLoggerView(props: WorkLoggerState) {
                   <button
                     type="button"
                     className={styles.signOutButton}
-                    onClick={props.handleSignOut}
+                    onClick={props.onSignOut}
                   >
                     Sign out
                   </button>

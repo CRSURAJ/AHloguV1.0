@@ -45,3 +45,16 @@ export type CurrentUser = {
   fullName: string;
   role: string;
 };
+
+export type OfflineUser = {
+  id: string;
+  fullName: string;
+  role: string;
+  pinHash: string;
+  isActive: boolean;
+};
+
+export type LocalAuthSession = {
+  userId: string;
+  signedInAt: string;
+};

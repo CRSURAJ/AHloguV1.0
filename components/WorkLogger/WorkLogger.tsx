@@ -2,8 +2,18 @@
 
 import { useWorkLogger } from "@/hooks/useWorkLogger";
 import { WorkLoggerView } from "@/components";
+import type { CurrentUser } from "@/types/work";
 
-export default function WorkLogger() {
-  const workLogger = useWorkLogger();
-  return <WorkLoggerView {...workLogger} />;
+type WorkLoggerProps = {
+  currentUser: CurrentUser;
+  onSignOut: () => void;
+};
+
+export default function WorkLogger({
+  currentUser,
+  onSignOut,
+}: WorkLoggerProps) {
+  const workLogger = useWorkLogger(currentUser);
+
+  return <WorkLoggerView {...workLogger} onSignOut={onSignOut} />;
 }
