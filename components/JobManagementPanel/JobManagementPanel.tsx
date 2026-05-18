@@ -287,24 +287,26 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
             </div>
           </div>
 
-          <label className={styles.activeToggle}>
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(event) =>
-                updateField("isActive", event.target.checked)
-              }
-            />
-            Active Job
-          </label>
+          <div className={styles.formActions}>
+            <label className={styles.activeToggle}>
+              <input
+                type="checkbox"
+                checked={form.isActive}
+                onChange={(event) =>
+                  updateField("isActive", event.target.checked)
+                }
+              />
+              Active Job
+            </label>
 
-          <button
-            className={styles.primaryButton}
-            type="button"
-            onClick={() => void handleSubmit()}
-          >
-            {editingJobId ? "Save Job" : "Create Job"}
-          </button>
+            <button
+              className={styles.primaryButton}
+              type="button"
+              onClick={() => void handleSubmit()}
+            >
+              {editingJobId ? "Save Job" : "Create Job"}
+            </button>
+          </div>
         </div>
 
         <div className={styles.card}>
