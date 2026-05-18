@@ -111,3 +111,28 @@ export type LogItem = {
   stickyNote?: string;
   syncedAt?: number;
 };
+
+export type JobDoc = {
+  id: string;
+  fileName: string;
+  fileData: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+};
+
+export type Job = {
+  id: string;
+  caseNo: string;
+  jobId: string;
+  orderNo: string;
+  jobName: string;
+  customerName: string;
+  location: string;
+  description: string;
+  assignedRoles: WorkerRole[];
+  jobDocs: JobDoc[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
