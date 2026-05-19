@@ -2,7 +2,12 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { ActionButtons, LogsList, WorkerForm } from "@/components";
+import {
+  ActionButtons,
+  CloudSyncStatus,
+  LogsList,
+  WorkerForm,
+} from "@/components";
 import type { WorkLoggerState } from "@/hooks/useWorkLogger";
 import type { CurrentUser } from "@/types/work";
 import styles from "./WorkLoggerView.module.css";
@@ -291,7 +296,7 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
                 </div>
               </div>
             ) : null}
-
+            <CloudSyncStatus />
             <LogsList
               logs={props.logs}
               expandedLogId={props.expandedLogId}
