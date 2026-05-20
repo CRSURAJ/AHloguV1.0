@@ -110,6 +110,39 @@ export function getCurrentCognitoSession(): Promise<CognitoUserSession | null> {
   });
 }
 
+export function changeCurrentCognitoPassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const cognitoUser = getCurrentCognitoUser();
+
+  if (!cognitoUser) {
+    return Promise.reject(new Error("No signed-in Cognito user found."));
+  }
+
+  return new Promise((resolve, reject) => {
+    cognitoUser.getSession((sessionError: Error | null) => {
+      if (sessionError) {
+        reject(sessionError);
+        return;
+      }
+
+      cognitoUser.changePassword(
+        currentPassword,
+        newPassword,
+        (changeError) => {
+          if (changeError) {
+            reject(changeError);
+            return;
+          }
+
+          resolve();
+        },
+      );
+    });
+  });
+}
+
 export function signOutCognito() {
   const cognitoUser = getCurrentCognitoUser();
   cognitoUser?.signOut();

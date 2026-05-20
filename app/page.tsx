@@ -9,6 +9,7 @@ import JobManagementPanel from "@/components/JobManagementPanel/JobManagementPan
 import UserManagementPanel from "@/components/UserManagementPanel/UserManagementPanel";
 import WorkLogger from "@/components/WorkLogger/WorkLogger";
 import {
+  changeCurrentCognitoPassword,
   completeNewCognitoPassword,
   getCurrentCognitoSession,
   signInWithCognito,
@@ -565,6 +566,11 @@ export default function Page() {
   const [newPasswordUser, setNewPasswordUser] =
     useState<NonNullable<CognitoSignInResult["cognitoUser"]> | null>(null);
   const [accountMessage, setAccountMessage] = useState("");
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [currentPasswordInput, setCurrentPasswordInput] = useState("");
+  const [newPasswordInput, setNewPasswordInput] = useState("");
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState("");
+  const [changePasswordBusy, setChangePasswordBusy] = useState(false);
   const [userManagementOpen, setUserManagementOpen] = useState(false);
   const [awsUsers, setAwsUsers] = useState<AwsUserListItem[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -966,6 +972,57 @@ export default function Page() {
     }
   }
 
+  function handleOpenChangePassword() {
+    setAccountMessage("");
+    setCurrentPasswordInput("");
+    setNewPasswordInput("");
+    setConfirmPasswordInput("");
+    setChangePasswordOpen(true);
+  }
+
+  function handleCloseChangePassword() {
+    if (changePasswordBusy) {
+      return;
+    }
+
+    setChangePasswordOpen(false);
+    setCurrentPasswordInput("");
+    setNewPasswordInput("");
+    setConfirmPasswordInput("");
+  }
+
+  async function handleChangePasswordSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAccountMessage("");
+
+    if (newPasswordInput.trim().length < 8) {
+      setAccountMessage("New password must be at least 8 characters.");
+      return;
+    }
+
+    if (newPasswordInput !== confirmPasswordInput) {
+      setAccountMessage("New passwords do not match.");
+      return;
+    }
+
+    setChangePasswordBusy(true);
+
+    try {
+      await changeCurrentCognitoPassword(currentPasswordInput, newPasswordInput);
+      setCurrentPasswordInput("");
+      setNewPasswordInput("");
+      setConfirmPasswordInput("");
+      setChangePasswordOpen(false);
+      setAccountMessage("Password changed successfully.");
+    } catch (error) {
+      setAccountMessage(
+        error instanceof Error ? error.message : "Could not change password.",
+      );
+    } finally {
+      setChangePasswordBusy(false);
+    }
+  }
+
   function handleSignOut() {
     signOutCognito();
     setCurrentUser(null);
@@ -974,6 +1031,10 @@ export default function Page() {
     setConfirmNewPassword("");
     setNewPasswordUser(null);
     setAccountMessage("");
+    setChangePasswordOpen(false);
+    setCurrentPasswordInput("");
+    setNewPasswordInput("");
+    setConfirmPasswordInput("");
     setUserManagementOpen(false);
     setJobManagementOpen(false);
     setMessage("Signed out.");
@@ -1007,12 +1068,8 @@ export default function Page() {
       <>
         <AdminDashboard
           currentUser={currentUser}
-          securityLabel="Cognito account"
-          onOpenSecurity={() =>
-            setAccountMessage(
-              "Password changes are now controlled by Cognito. Main password-change UI can be added after this login cutover is confirmed.",
-            )
-          }
+          securityLabel="Change Password"
+          onOpenSecurity={handleOpenChangePassword}
           onOpenUserManagement={() => void handleOpenUserManagement()}
           onOpenJobManagement={() => setJobManagementOpen(true)}
           onSignOut={handleSignOut}
@@ -1061,6 +1118,171 @@ export default function Page() {
           </div>
         ) : null}
 
+        {changePasswordOpen ? (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              display: "grid",
+              placeItems: "center",
+              padding: "20px",
+              background: "rgba(0,0,0,0.48)",
+              zIndex: 100,
+            }}
+          >
+            <form
+              onSubmit={(event) => void handleChangePasswordSubmit(event)}
+              style={{
+                width: "min(460px, 100%)",
+                borderRadius: "24px",
+                padding: "24px",
+                background: "#11302D",
+                color: "#eef7f3",
+                border: "1px solid rgba(255,255,255,0.14)",
+                boxShadow: "0 24px 70px rgba(0,0,0,0.3)",
+              }}
+            >
+              <h2 style={{ marginTop: 0 }}>Change Password</h2>
+
+              <p style={{ lineHeight: 1.5, color: "rgba(255,255,255,0.72)" }}>
+                Enter your current password, then choose a new Cognito password.
+              </p>
+
+              {accountMessage ? (
+                <div
+                  style={{
+                    marginBottom: "16px",
+                    padding: "12px 14px",
+                    borderRadius: "16px",
+                    background: "rgba(255,255,255,0.1)",
+                    color: "#eef7f3",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {accountMessage}
+                </div>
+              ) : null}
+
+              <label
+                style={{
+                  display: "grid",
+                  gap: "8px",
+                  marginBottom: "14px",
+                  fontWeight: 700,
+                }}
+              >
+                Current password
+                <input
+                  type="password"
+                  value={currentPasswordInput}
+                  onChange={(event) => setCurrentPasswordInput(event.target.value)}
+                  autoComplete="current-password"
+                  required
+                  style={{
+                    width: "100%",
+                    border: "1px solid rgba(255,255,255,0.14)",
+                    borderRadius: "16px",
+                    padding: "14px 16px",
+                    background: "rgba(255,255,255,0.08)",
+                    color: "#eef7f3",
+                    font: "inherit",
+                  }}
+                />
+              </label>
+
+              <label
+                style={{
+                  display: "grid",
+                  gap: "8px",
+                  marginBottom: "14px",
+                  fontWeight: 700,
+                }}
+              >
+                New password
+                <input
+                  type="password"
+                  value={newPasswordInput}
+                  onChange={(event) => setNewPasswordInput(event.target.value)}
+                  autoComplete="new-password"
+                  required
+                  style={{
+                    width: "100%",
+                    border: "1px solid rgba(255,255,255,0.14)",
+                    borderRadius: "16px",
+                    padding: "14px 16px",
+                    background: "rgba(255,255,255,0.08)",
+                    color: "#eef7f3",
+                    font: "inherit",
+                  }}
+                />
+              </label>
+
+              <label
+                style={{
+                  display: "grid",
+                  gap: "8px",
+                  marginBottom: "18px",
+                  fontWeight: 700,
+                }}
+              >
+                Confirm new password
+                <input
+                  type="password"
+                  value={confirmPasswordInput}
+                  onChange={(event) => setConfirmPasswordInput(event.target.value)}
+                  autoComplete="new-password"
+                  required
+                  style={{
+                    width: "100%",
+                    border: "1px solid rgba(255,255,255,0.14)",
+                    borderRadius: "16px",
+                    padding: "14px 16px",
+                    background: "rgba(255,255,255,0.08)",
+                    color: "#eef7f3",
+                    font: "inherit",
+                  }}
+                />
+              </label>
+
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <button
+                  type="submit"
+                  disabled={changePasswordBusy}
+                  style={{
+                    border: 0,
+                    borderRadius: "14px",
+                    padding: "12px 16px",
+                    background: changePasswordBusy ? "rgba(83,188,123,0.5)" : "#53BC7B",
+                    color: "#11302D",
+                    fontWeight: 800,
+                    cursor: changePasswordBusy ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {changePasswordBusy ? "Changing..." : "Change Password"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCloseChangePassword}
+                  disabled={changePasswordBusy}
+                  style={{
+                    border: "1px solid rgba(255,255,255,0.14)",
+                    borderRadius: "14px",
+                    padding: "12px 16px",
+                    background: "rgba(255,255,255,0.08)",
+                    color: "#eef7f3",
+                    fontWeight: 800,
+                    cursor: changePasswordBusy ? "not-allowed" : "pointer",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : null}
+
+
         {userManagementOpen ? (
           <UserManagementPanel
             users={awsUsers}
@@ -1084,17 +1306,222 @@ export default function Page() {
   }
 
   return (
-    <WorkLogger
-      currentUser={currentUser}
-      onSignOut={handleSignOut}
-      onOpenSecurity={() =>
-        setAccountMessage(
-          "Password changes are now controlled by Cognito. Main password-change UI can be added after this login cutover is confirmed.",
-        )
-      }
-      onOpenUserManagement={() => {}}
-      canManageUsers={false}
-      securityLabel="Cognito account"
-    />
+    <>
+      {changePasswordOpen ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            display: "grid",
+            placeItems: "center",
+            padding: "20px",
+            background: "rgba(0,0,0,0.48)",
+            zIndex: 100,
+          }}
+        >
+          <form
+            onSubmit={(event) => void handleChangePasswordSubmit(event)}
+            style={{
+              width: "min(460px, 100%)",
+              borderRadius: "24px",
+              padding: "24px",
+              background: "#11302D",
+              color: "#eef7f3",
+              border: "1px solid rgba(255,255,255,0.14)",
+              boxShadow: "0 24px 70px rgba(0,0,0,0.3)",
+            }}
+          >
+            <h2 style={{ marginTop: 0 }}>Change Password</h2>
+
+            <p style={{ lineHeight: 1.5, color: "rgba(255,255,255,0.72)" }}>
+              Enter your current password, then choose a new Cognito password.
+            </p>
+
+            {accountMessage ? (
+              <div
+                style={{
+                  marginBottom: "16px",
+                  padding: "12px 14px",
+                  borderRadius: "16px",
+                  background: "rgba(255,255,255,0.1)",
+                  color: "#eef7f3",
+                  lineHeight: 1.45,
+                }}
+              >
+                {accountMessage}
+              </div>
+            ) : null}
+
+            <label
+              style={{
+                display: "grid",
+                gap: "8px",
+                marginBottom: "14px",
+                fontWeight: 700,
+              }}
+            >
+              Current password
+              <input
+                type="password"
+                value={currentPasswordInput}
+                onChange={(event) => setCurrentPasswordInput(event.target.value)}
+                autoComplete="current-password"
+                required
+                style={{
+                  width: "100%",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  borderRadius: "16px",
+                  padding: "14px 16px",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#eef7f3",
+                  font: "inherit",
+                }}
+              />
+            </label>
+
+            <label
+              style={{
+                display: "grid",
+                gap: "8px",
+                marginBottom: "14px",
+                fontWeight: 700,
+              }}
+            >
+              New password
+              <input
+                type="password"
+                value={newPasswordInput}
+                onChange={(event) => setNewPasswordInput(event.target.value)}
+                autoComplete="new-password"
+                required
+                style={{
+                  width: "100%",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  borderRadius: "16px",
+                  padding: "14px 16px",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#eef7f3",
+                  font: "inherit",
+                }}
+              />
+            </label>
+
+            <label
+              style={{
+                display: "grid",
+                gap: "8px",
+                marginBottom: "18px",
+                fontWeight: 700,
+              }}
+            >
+              Confirm new password
+              <input
+                type="password"
+                value={confirmPasswordInput}
+                onChange={(event) => setConfirmPasswordInput(event.target.value)}
+                autoComplete="new-password"
+                required
+                style={{
+                  width: "100%",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  borderRadius: "16px",
+                  padding: "14px 16px",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#eef7f3",
+                  font: "inherit",
+                }}
+              />
+            </label>
+
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <button
+                type="submit"
+                disabled={changePasswordBusy}
+                style={{
+                  border: 0,
+                  borderRadius: "14px",
+                  padding: "12px 16px",
+                  background: changePasswordBusy ? "rgba(83,188,123,0.5)" : "#53BC7B",
+                  color: "#11302D",
+                  fontWeight: 800,
+                  cursor: changePasswordBusy ? "not-allowed" : "pointer",
+                }}
+              >
+                {changePasswordBusy ? "Changing..." : "Change Password"}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCloseChangePassword}
+                disabled={changePasswordBusy}
+                style={{
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  borderRadius: "14px",
+                  padding: "12px 16px",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#eef7f3",
+                  fontWeight: 800,
+                  cursor: changePasswordBusy ? "not-allowed" : "pointer",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {accountMessage && !changePasswordOpen ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            display: "grid",
+            placeItems: "center",
+            padding: "20px",
+            background: "rgba(0,0,0,0.48)",
+            zIndex: 100,
+          }}
+        >
+          <div
+            style={{
+              width: "min(460px, 100%)",
+              borderRadius: "24px",
+              padding: "24px",
+              background: "#11302D",
+              color: "#eef7f3",
+              border: "1px solid rgba(255,255,255,0.14)",
+            }}
+          >
+            <h2 style={{ marginTop: 0 }}>Account</h2>
+            <p style={{ lineHeight: 1.5 }}>{accountMessage}</p>
+            <button
+              type="button"
+              onClick={() => setAccountMessage("")}
+              style={{
+                border: 0,
+                borderRadius: "14px",
+                padding: "12px 16px",
+                background: "#53BC7B",
+                color: "#11302D",
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <WorkLogger
+        currentUser={currentUser}
+        onSignOut={handleSignOut}
+        onOpenSecurity={handleOpenChangePassword}
+        onOpenUserManagement={() => {}}
+        canManageUsers={false}
+        securityLabel="Change Password"
+      />
+    </>
   );
 }
