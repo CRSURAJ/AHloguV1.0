@@ -109,16 +109,35 @@ async function requestJson<TPayload>(
           : JSON.stringify(options.payload),
     });
 
+    const data: unknown = await response.json().catch(() => null);
+
     if (!response.ok) {
+      const message =
+        data &&
+        typeof data === "object" &&
+        "error" in data &&
+        typeof data.error === "string"
+          ? data.error
+          : `AWS API request failed with status ${response.status}.`;
+
       return {
         ok: false,
-        message: `AWS API request failed with status ${response.status}.`,
+        message,
       };
     }
+
+    const cloudId =
+      data &&
+      typeof data === "object" &&
+      "cloudId" in data &&
+      typeof data.cloudId === "string"
+        ? data.cloudId
+        : undefined;
 
     return {
       ok: true,
       message: "AWS API request successful.",
+      cloudId,
     };
   } catch (error) {
     return {

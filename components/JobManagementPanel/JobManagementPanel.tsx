@@ -267,8 +267,8 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
           <div>
             <h2>Job Management</h2>
             <p className={styles.subtitle}>
-              Create local jobs and assign them to worker roles. Admin users can
-              see all jobs automatically.
+              Create jobs and assign them to worker roles. Jobs are stored locally
+              first and synced to AWS when cloud mode is enabled.
             </p>
           </div>
 

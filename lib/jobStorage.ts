@@ -1,3 +1,4 @@
+import { getCloudProvider } from "@/lib/cloud/client";
 import { WORKER_ROLE_OPTIONS } from "@/types/work";
 import type { Job, WorkerRole } from "@/types/work";
 
@@ -23,6 +24,50 @@ export type UpdateJobInput = Partial<CreateJobInput> & {
 const VALID_WORKER_ROLES = new Set<WorkerRole>(
   WORKER_ROLE_OPTIONS.map((option) => option.value)
 );
+
+function getCloud() {
+  return getCloudProvider();
+}
+
+function shouldUseAwsJobs(): boolean {
+  return getCloud().providerName === "aws";
+}
+
+function stripJobDrawingsForCloud(job: Job): Job {
+  return {
+    ...job,
+    jobDrawings: [],
+  };
+}
+
+function mergeCloudJobsWithLocalDrawings(
+  cloudJobs: Job[],
+  localJobs: Job[]
+): Job[] {
+  return cloudJobs.map((cloudJob) => {
+    const localJob = localJobs.find((job) => job.id === cloudJob.id);
+
+    return {
+      ...cloudJob,
+      jobDrawings: localJob?.jobDrawings ?? cloudJob.jobDrawings ?? [],
+    };
+  });
+}
+
+async function loadLocalJobs(): Promise<Job[]> {
+  if (typeof window === "undefined") return [];
+
+  const raw = window.localStorage.getItem(JOBS_STORAGE_KEY);
+  const parsed = parseJson<unknown[]>(raw);
+
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed
+    .map(normalizeJob)
+    .filter((job): job is Job => job !== null)
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+}
+
 
 function makeId(prefix: string): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -94,17 +139,23 @@ function normalizeJob(value: unknown, index: number): Job | null {
 }
 
 export async function loadJobs(): Promise<Job[]> {
-  if (typeof window === "undefined") return [];
+  const localJobs = await loadLocalJobs();
 
-  const raw = window.localStorage.getItem(JOBS_STORAGE_KEY);
-  const parsed = parseJson<unknown[]>(raw);
+  if (!shouldUseAwsJobs()) {
+    return localJobs;
+  }
 
-  if (!Array.isArray(parsed)) return [];
+  const cloudJobs = await getCloud().jobs.list();
 
-  return parsed
-    .map(normalizeJob)
-    .filter((job): job is Job => job !== null)
-    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  if (cloudJobs.length === 0) {
+    return localJobs;
+  }
+
+  const mergedJobs = mergeCloudJobsWithLocalDrawings(cloudJobs, localJobs);
+
+  await saveJobs(mergedJobs);
+
+  return mergedJobs;
 }
 
 export async function saveJobs(jobs: Job[]): Promise<void> {
@@ -134,6 +185,14 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
   };
 
   await saveJobs([job, ...jobs]);
+
+  if (shouldUseAwsJobs()) {
+    const result = await getCloud().jobs.create(stripJobDrawingsForCloud(job));
+
+    if (!result.ok) {
+      throw new Error(result.message || "Could not create job in AWS.");
+    }
+  }
 
   return job;
 }
@@ -166,6 +225,14 @@ export async function updateJob(
 
   await saveJobs(jobs.map((job) => (job.id === id ? updatedJob : job)));
 
+  if (shouldUseAwsJobs()) {
+    const result = await getCloud().jobs.update(stripJobDrawingsForCloud(updatedJob));
+
+    if (!result.ok) {
+      throw new Error(result.message || "Could not update job in AWS.");
+    }
+  }
+
   return updatedJob;
 }
 
@@ -173,6 +240,14 @@ export async function deleteJob(id: string): Promise<void> {
   const jobs = await loadJobs();
 
   await saveJobs(jobs.filter((job) => job.id !== id));
+
+  if (shouldUseAwsJobs()) {
+    const result = await getCloud().jobs.delete(id);
+
+    if (!result.ok) {
+      throw new Error(result.message || "Could not delete job in AWS.");
+    }
+  }
 }
 
 export async function getActiveJobs(): Promise<Job[]> {
