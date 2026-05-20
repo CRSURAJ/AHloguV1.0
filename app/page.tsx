@@ -1,95 +1,740 @@
 "use client";
 
-import { useState } from "react";
+import Image from "next/image";
+import type { FormEvent } from "react";
+import { useEffect, useState } from "react";
+
 import AdminDashboard from "@/components/AdminDashboard";
-import LoginScreen from "@/components/LoginScreen/LoginScreen";
-import SecurityPanel from "@/components/SecurityPanel/SecurityPanel";
-import UserManagementPanel from "@/components/UserManagementPanel/UserManagementPanel";
 import JobManagementPanel from "@/components/JobManagementPanel/JobManagementPanel";
 import WorkLogger from "@/components/WorkLogger/WorkLogger";
-import { useLocalAuth } from "@/hooks/useLocalAuth";
+import {
+  completeNewCognitoPassword,
+  getCurrentCognitoSession,
+  signInWithCognito,
+  signOutCognito,
+  type CognitoSignInResult,
+} from "@/lib/auth/cognitoClient";
+import type {
+  CredentialType,
+  CurrentUser,
+  PermissionLevel,
+  WorkerRole,
+} from "@/types/work";
+
+type ProfileRecord = Record<string, unknown>;
+
+const WORKER_ROLES: WorkerRole[] = [
+  "plumber",
+  "electrician",
+  "gas_fitter",
+  "hvac_technician",
+  "refrigeration_technician",
+  "apprentice",
+  "supervisor",
+  "other",
+];
+
+function getStringValue(source: ProfileRecord, keys: string[]): string {
+  for (const key of keys) {
+    const value = source[key];
+
+    if (typeof value === "string" && value.trim() !== "") {
+      return value.trim();
+    }
+  }
+
+  return "";
+}
+
+function getBooleanValue(source: ProfileRecord, keys: string[]): boolean {
+  for (const key of keys) {
+    const value = source[key];
+
+    if (typeof value === "boolean") {
+      return value;
+    }
+
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+
+      if (normalized === "true" || normalized === "yes") {
+        return true;
+      }
+
+      if (normalized === "false" || normalized === "no") {
+        return false;
+      }
+    }
+  }
+
+  return false;
+}
+
+function getProfileRecord(responseJson: unknown): ProfileRecord {
+  if (!responseJson || typeof responseJson !== "object") {
+    return {};
+  }
+
+  const root = responseJson as ProfileRecord;
+
+  for (const key of ["user", "profile", "me", "item"]) {
+    const value = root[key];
+
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value as ProfileRecord;
+    }
+  }
+
+  return root;
+}
+
+function normalizeWorkerRole(value: string): WorkerRole {
+  const normalized = value.trim().toLowerCase();
+
+  if (WORKER_ROLES.includes(normalized as WorkerRole)) {
+    return normalized as WorkerRole;
+  }
+
+  if (normalized === "admin") {
+    return "supervisor";
+  }
+
+  if (normalized === "hvac technician") {
+    return "hvac_technician";
+  }
+
+  if (normalized === "refrigeration technician") {
+    return "refrigeration_technician";
+  }
+
+  if (normalized === "gas fitter") {
+    return "gas_fitter";
+  }
+
+  return "other";
+}
+
+function normalizePermissionLevel(profile: ProfileRecord): PermissionLevel {
+  const permissionLevel = getStringValue(profile, [
+    "permissionLevel",
+    "permission_level",
+    "accessLevel",
+    "access_level",
+  ]).toLowerCase();
+
+  const role = getStringValue(profile, ["role", "userRole", "user_role"]).toLowerCase();
+
+  const isAdmin = getBooleanValue(profile, ["isAdmin", "is_admin", "admin"]);
+
+  if (isAdmin || permissionLevel === "admin" || role === "admin") {
+    return "admin";
+  }
+
+  return "user";
+}
+
+function convertProfileToCurrentUser(
+  profile: ProfileRecord,
+  fallbackEmail: string,
+  fallbackSub: string,
+): CurrentUser {
+  const username =
+    getStringValue(profile, ["email", "username", "userName"]) || fallbackEmail;
+
+  const fullName =
+    getStringValue(profile, ["fullName", "full_name", "name", "displayName"]) ||
+    username ||
+    fallbackEmail;
+
+  const role = normalizeWorkerRole(
+    getStringValue(profile, [
+      "workerRole",
+      "worker_role",
+      "tradeRole",
+      "trade_role",
+      "role",
+    ]),
+  );
+
+  const credentialType: CredentialType = "password";
+
+  return {
+    id:
+      getStringValue(profile, ["id", "userId", "user_id", "sub"]) ||
+      fallbackSub ||
+      username,
+    username,
+    fullName,
+    permissionLevel: normalizePermissionLevel(profile),
+    role,
+    credentialType,
+    mustChangeCredential: false,
+  };
+}
+
+function getApiBaseUrl(): string {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_AHLOGU_API_URL;
+
+  if (!apiBaseUrl) {
+    throw new Error("Missing NEXT_PUBLIC_AHLOGU_API_URL.");
+  }
+
+  return apiBaseUrl.replace(/\/$/, "");
+}
+
+async function fetchCurrentUserFromCloud(
+  session: NonNullable<Awaited<ReturnType<typeof getCurrentCognitoSession>>>,
+): Promise<CurrentUser> {
+  const idToken = session.getIdToken().getJwtToken();
+  const payload = session.getIdToken().decodePayload() as ProfileRecord;
+  const fallbackEmail = getStringValue(payload, ["email", "username"]);
+  const fallbackSub = getStringValue(payload, ["sub"]);
+
+  const response = await fetch(`${getApiBaseUrl()}/me`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      errorText || `Could not load AHlogu user profile. Status ${response.status}.`,
+    );
+  }
+
+  const responseJson = (await response.json()) as unknown;
+  const profile = getProfileRecord(responseJson);
+
+  const isActiveRaw = profile.isActive ?? profile.is_active;
+
+  if (isActiveRaw === false || isActiveRaw === "false") {
+    throw new Error("This AHlogu user is inactive.");
+  }
+
+  return convertProfileToCurrentUser(profile, fallbackEmail, fallbackSub);
+}
+
+function LoadingScreen() {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        background: "#085153",
+        color: "#eef7f3",
+        fontWeight: 700,
+      }}
+    >
+      Loading…
+    </div>
+  );
+}
+
+type CognitoLoginCardProps = {
+  email: string;
+  password: string;
+  newPassword: string;
+  confirmNewPassword: string;
+  message: string;
+  isBusy: boolean;
+  requiresNewPassword: boolean;
+  onEmailChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onNewPasswordChange: (value: string) => void;
+  onConfirmNewPasswordChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+};
+
+function CognitoLoginCard({
+  email,
+  password,
+  newPassword,
+  confirmNewPassword,
+  message,
+  isBusy,
+  requiresNewPassword,
+  onEmailChange,
+  onPasswordChange,
+  onNewPasswordChange,
+  onConfirmNewPasswordChange,
+  onSubmit,
+}: CognitoLoginCardProps) {
+  return (
+    <main
+      style={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        padding: "24px",
+        background:
+          "radial-gradient(circle at top left, rgba(83, 188, 123, 0.25), transparent 34%), #085153",
+        color: "#eef7f3",
+      }}
+    >
+      <form
+        onSubmit={onSubmit}
+        style={{
+          width: "100%",
+          maxWidth: "430px",
+          border: "1px solid rgba(255,255,255,0.16)",
+          borderRadius: "28px",
+          padding: "28px",
+          background: "rgba(17, 48, 45, 0.92)",
+          boxShadow: "0 24px 70px rgba(0,0,0,0.28)",
+        }}
+      >
+        <div style={{ marginBottom: "24px" }}>
+          <Image
+            src="/AHlogu.png"
+            alt="AH LOGU"
+            width={160}
+            height={48}
+            priority
+            style={{ objectFit: "contain", marginBottom: "18px" }}
+          />
+
+          <h1 style={{ margin: 0, fontSize: "28px", lineHeight: 1.1 }}>
+            Sign in to AHlogu
+          </h1>
+
+          <p
+            style={{
+              margin: "10px 0 0",
+              color: "rgba(255,255,255,0.68)",
+              lineHeight: 1.5,
+            }}
+          >
+            Use your Cognito email and password. Local login is no longer used.
+          </p>
+        </div>
+
+        {message ? (
+          <div
+            style={{
+              marginBottom: "16px",
+              padding: "12px 14px",
+              borderRadius: "16px",
+              background: "rgba(255,255,255,0.1)",
+              color: "#eef7f3",
+              lineHeight: 1.45,
+            }}
+          >
+            {message}
+          </div>
+        ) : null}
+
+        {!requiresNewPassword ? (
+          <>
+            <label
+              style={{
+                display: "grid",
+                gap: "8px",
+                marginBottom: "14px",
+                fontWeight: 700,
+              }}
+            >
+              Email
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => onEmailChange(event.target.value)}
+                autoComplete="email"
+                required
+                style={{
+                  width: "100%",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  borderRadius: "16px",
+                  padding: "14px 16px",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#eef7f3",
+                  font: "inherit",
+                }}
+              />
+            </label>
+
+            <label
+              style={{
+                display: "grid",
+                gap: "8px",
+                marginBottom: "18px",
+                fontWeight: 700,
+              }}
+            >
+              Password
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => onPasswordChange(event.target.value)}
+                autoComplete="current-password"
+                required
+                style={{
+                  width: "100%",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  borderRadius: "16px",
+                  padding: "14px 16px",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#eef7f3",
+                  font: "inherit",
+                }}
+              />
+            </label>
+          </>
+        ) : (
+          <>
+            <label
+              style={{
+                display: "grid",
+                gap: "8px",
+                marginBottom: "14px",
+                fontWeight: 700,
+              }}
+            >
+              New password
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(event) => onNewPasswordChange(event.target.value)}
+                autoComplete="new-password"
+                required
+                style={{
+                  width: "100%",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  borderRadius: "16px",
+                  padding: "14px 16px",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#eef7f3",
+                  font: "inherit",
+                }}
+              />
+            </label>
+
+            <label
+              style={{
+                display: "grid",
+                gap: "8px",
+                marginBottom: "18px",
+                fontWeight: 700,
+              }}
+            >
+              Confirm new password
+              <input
+                type="password"
+                value={confirmNewPassword}
+                onChange={(event) =>
+                  onConfirmNewPasswordChange(event.target.value)
+                }
+                autoComplete="new-password"
+                required
+                style={{
+                  width: "100%",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  borderRadius: "16px",
+                  padding: "14px 16px",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#eef7f3",
+                  font: "inherit",
+                }}
+              />
+            </label>
+          </>
+        )}
+
+        <button
+          type="submit"
+          disabled={isBusy}
+          style={{
+            width: "100%",
+            border: 0,
+            borderRadius: "16px",
+            padding: "14px 16px",
+            background: isBusy ? "rgba(83,188,123,0.5)" : "#53BC7B",
+            color: "#11302D",
+            font: "inherit",
+            fontWeight: 800,
+            cursor: isBusy ? "not-allowed" : "pointer",
+          }}
+        >
+          {isBusy
+            ? "Please wait…"
+            : requiresNewPassword
+              ? "Set new password"
+              : "Sign in"}
+        </button>
+      </form>
+    </main>
+  );
+}
 
 export default function Page() {
-  const auth = useLocalAuth();
-  const [securityRequested, setSecurityRequested] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [newPasswordUser, setNewPasswordUser] =
+    useState<NonNullable<CognitoSignInResult["cognitoUser"]> | null>(null);
+  const [accountMessage, setAccountMessage] = useState("");
   const [userManagementOpen, setUserManagementOpen] = useState(false);
   const [jobManagementOpen, setJobManagementOpen] = useState(false);
 
-  const securityForced = auth.currentUser?.mustChangeCredential === true;
+  const canManageUsers = currentUser?.permissionLevel === "admin";
 
-  if (!auth.isReady) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "grid",
-          placeItems: "center",
-          background: "#085153",
-          color: "#eef7f3",
-          fontWeight: 700,
-        }}
-      >
-        Loading…
-      </div>
-    );
+  useEffect(() => {
+    let isMounted = true;
+
+    async function restoreSession() {
+      try {
+        const session = await getCurrentCognitoSession();
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (!session) {
+          setIsReady(true);
+          return;
+        }
+
+        const restoredUser = await fetchCurrentUserFromCloud(session);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setCurrentUser(restoredUser);
+      } catch (error) {
+        signOutCognito();
+
+        if (isMounted) {
+          setMessage(
+            error instanceof Error
+              ? error.message
+              : "Could not restore your Cognito session.",
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsReady(true);
+        }
+      }
+    }
+
+    restoreSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  async function finishSignIn(
+    session: NonNullable<Awaited<ReturnType<typeof getCurrentCognitoSession>>>,
+  ) {
+    const cloudUser = await fetchCurrentUserFromCloud(session);
+    setCurrentUser(cloudUser);
+    setPassword("");
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setMessage("");
+    setNewPasswordUser(null);
   }
 
-  if (!auth.currentUser) {
+  async function handleLoginSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsBusy(true);
+    setMessage("");
+
+    try {
+      if (newPasswordUser) {
+        if (newPassword.trim().length < 8) {
+          setMessage("New password must be at least 8 characters.");
+          return;
+        }
+
+        if (newPassword !== confirmNewPassword) {
+          setMessage("New passwords do not match.");
+          return;
+        }
+
+        const session = await completeNewCognitoPassword(
+          newPasswordUser,
+          newPassword,
+        );
+
+        await finishSignIn(session);
+        return;
+      }
+
+      const result = await signInWithCognito(email.trim(), password);
+
+      if (result.status === "new-password-required" && result.cognitoUser) {
+        setNewPasswordUser(result.cognitoUser);
+        setPassword("");
+        setMessage("Cognito requires a new password before continuing.");
+        return;
+      }
+
+      if (!result.session) {
+        setMessage("Cognito sign in succeeded but no session was returned.");
+        return;
+      }
+
+      await finishSignIn(result.session);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Cognito sign in failed.",
+      );
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  function handleSignOut() {
+    signOutCognito();
+    setCurrentUser(null);
+    setPassword("");
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setNewPasswordUser(null);
+    setAccountMessage("");
+    setUserManagementOpen(false);
+    setJobManagementOpen(false);
+    setMessage("Signed out.");
+  }
+
+  if (!isReady) {
+    return <LoadingScreen />;
+  }
+
+  if (!currentUser) {
     return (
-      <LoginScreen
-        loginUsername={auth.loginUsername}
-        setLoginUsername={auth.setLoginUsername}
-        loginSecret={auth.loginSecret}
-        setLoginSecret={auth.setLoginSecret}
-        authMessage={auth.authMessage}
-        handleLogin={auth.handleLogin}
+      <CognitoLoginCard
+        email={email}
+        password={password}
+        newPassword={newPassword}
+        confirmNewPassword={confirmNewPassword}
+        message={message}
+        isBusy={isBusy}
+        requiresNewPassword={newPasswordUser !== null}
+        onEmailChange={setEmail}
+        onPasswordChange={setPassword}
+        onNewPasswordChange={setNewPassword}
+        onConfirmNewPasswordChange={setConfirmNewPassword}
+        onSubmit={handleLoginSubmit}
       />
     );
   }
 
-  if (securityForced) {
-    return (
-      <SecurityPanel
-        credentialType={auth.currentUser.credentialType}
-        forced={true}
-        onClose={() => {}}
-        onSubmit={auth.handleChangeOwnCredential}
-      />
-    );
-  }
-
-  if (auth.canManageUsers) {
+  if (canManageUsers) {
     return (
       <>
         <AdminDashboard
-          currentUser={auth.currentUser}
-          securityLabel={auth.securityLabel}
-          onOpenSecurity={() => setSecurityRequested(true)}
+          currentUser={currentUser}
+          securityLabel="Cognito account"
+          onOpenSecurity={() =>
+            setAccountMessage(
+              "Password changes are now controlled by Cognito. Main password-change UI can be added after this login cutover is confirmed.",
+            )
+          }
           onOpenUserManagement={() => setUserManagementOpen(true)}
-
           onOpenJobManagement={() => setJobManagementOpen(true)}
-          onSignOut={auth.handleSignOut}
+          onSignOut={handleSignOut}
         />
 
-        {securityRequested ? (
-          <SecurityPanel
-            credentialType={auth.currentUser.credentialType}
-            forced={false}
-            onClose={() => setSecurityRequested(false)}
-            onSubmit={auth.handleChangeOwnCredential}
-          />
+        {accountMessage ? (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              display: "grid",
+              placeItems: "center",
+              padding: "20px",
+              background: "rgba(0,0,0,0.48)",
+              zIndex: 100,
+            }}
+          >
+            <div
+              style={{
+                width: "min(460px, 100%)",
+                borderRadius: "24px",
+                padding: "24px",
+                background: "#11302D",
+                color: "#eef7f3",
+                border: "1px solid rgba(255,255,255,0.14)",
+              }}
+            >
+              <h2 style={{ marginTop: 0 }}>Account</h2>
+              <p style={{ lineHeight: 1.5 }}>{accountMessage}</p>
+              <button
+                type="button"
+                onClick={() => setAccountMessage("")}
+                style={{
+                  border: 0,
+                  borderRadius: "14px",
+                  padding: "12px 16px",
+                  background: "#53BC7B",
+                  color: "#11302D",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         ) : null}
 
         {userManagementOpen ? (
-          <UserManagementPanel
-            users={auth.users}
-            currentUserId={auth.currentUser.id}
-            onClose={() => setUserManagementOpen(false)}
-            onCreateUser={auth.handleCreateUser}
-            onResetCredential={auth.handleAdminResetCredential}
-            onToggleActive={auth.handleToggleUserActive}
-            onDeleteUser={auth.handleDeleteUser}
-          />
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              display: "grid",
+              placeItems: "center",
+              padding: "20px",
+              background: "rgba(0,0,0,0.48)",
+              zIndex: 100,
+            }}
+          >
+            <div
+              style={{
+                width: "min(520px, 100%)",
+                borderRadius: "24px",
+                padding: "24px",
+                background: "#11302D",
+                color: "#eef7f3",
+                border: "1px solid rgba(255,255,255,0.14)",
+              }}
+            >
+              <h2 style={{ marginTop: 0 }}>User Management</h2>
+              <p style={{ lineHeight: 1.5 }}>
+                Main login is now Cognito-only. User Management should be moved
+                to Cognito/AHloguUsers next, instead of the old local user
+                store.
+              </p>
+              <button
+                type="button"
+                onClick={() => setUserManagementOpen(false)}
+                style={{
+                  border: 0,
+                  borderRadius: "14px",
+                  padding: "12px 16px",
+                  background: "#53BC7B",
+                  color: "#11302D",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         ) : null}
 
         {jobManagementOpen ? (
@@ -100,24 +745,17 @@ export default function Page() {
   }
 
   return (
-    <>
-      <WorkLogger
-        currentUser={auth.currentUser}
-        onSignOut={auth.handleSignOut}
-        onOpenSecurity={() => setSecurityRequested(true)}
-        onOpenUserManagement={() => {}}
-        canManageUsers={false}
-        securityLabel={auth.securityLabel}
-      />
-
-      {securityRequested ? (
-        <SecurityPanel
-          credentialType={auth.currentUser.credentialType}
-          forced={false}
-          onClose={() => setSecurityRequested(false)}
-          onSubmit={auth.handleChangeOwnCredential}
-        />
-      ) : null}
-    </>
+    <WorkLogger
+      currentUser={currentUser}
+      onSignOut={handleSignOut}
+      onOpenSecurity={() =>
+        setAccountMessage(
+          "Password changes are now controlled by Cognito. Main password-change UI can be added after this login cutover is confirmed.",
+        )
+      }
+      onOpenUserManagement={() => {}}
+      canManageUsers={false}
+      securityLabel="Cognito account"
+    />
   );
 }
