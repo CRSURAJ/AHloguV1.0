@@ -40,3 +40,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env.local
+
+# AWS Lambda build output
+aws/lambda/AHloguApi/node_modules/
+aws/lambda/AHloguApi/ahlogu-api.zip
+
+# AWS Lambda build output
+aws/lambda/AHloguApi/node_modules/
+aws/lambda/AHloguApi/ahlogu-api.zip

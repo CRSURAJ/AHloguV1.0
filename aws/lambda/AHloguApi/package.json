@@ -1,0 +1,15 @@
+{
+  "name": "ahlogu-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AWS Lambda API for AHlogu",
+  "main": "index.mjs",
+  "scripts": {
+    "zip": "rm -f ahlogu-api.zip && zip -r ahlogu-api.zip index.mjs package.json package-lock.json node_modules"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1050.0",
+    "@aws-sdk/lib-dynamodb": "^3.1050.0"
+  }
+}
