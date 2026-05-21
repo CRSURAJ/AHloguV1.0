@@ -1,7 +1,8 @@
 "use client";
 import PasswordRequirementsNote from "@/components/PasswordRequirementsNote";
+import FeedbackMessage from "@/components/FeedbackMessage";
 import { getPasswordPolicyError } from "@/lib/auth/passwordPolicy";
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import styles from "./UserManagementPanel.module.css";
 import {
   PERMISSION_LEVEL_OPTIONS,
@@ -35,6 +36,14 @@ export type CreateAwsUserInput = {
   confirmTemporaryPassword: string;
 };
 
+type CreateUserField =
+  | "fullName"
+  | "email"
+  | "permissionLevel"
+  | "role"
+  | "temporaryPassword"
+  | "confirmTemporaryPassword";
+
 type UserManagementPanelProps = {
   users: AwsUserListItem[];
   currentUserId: string;
@@ -60,6 +69,64 @@ function getPermissionLabel(permissionLevel: PermissionLevel): string {
       ?.label ?? permissionLevel
   );
 }
+
+function isValidEmailAddress(email: string): boolean {
+  const value = email.trim().toLowerCase();
+
+  if (!value) {
+    return false;
+  }
+
+  if (value.length > 254) {
+    return false;
+  }
+
+  if (value.includes("..")) {
+    return false;
+  }
+
+  if (value.startsWith(".") || value.endsWith(".")) {
+    return false;
+  }
+
+  const parts = value.split("@");
+
+  if (parts.length !== 2) {
+    return false;
+  }
+
+  const [localPart, domainPart] = parts;
+
+  if (!localPart || !domainPart) {
+    return false;
+  }
+
+  if (localPart.length > 64) {
+    return false;
+  }
+
+  if (
+    localPart.startsWith(".") ||
+    localPart.endsWith(".") ||
+    domainPart.startsWith(".") ||
+    domainPart.endsWith(".")
+  ) {
+    return false;
+  }
+
+  const domainLabels = domainPart.split(".");
+
+  if (domainLabels.length < 2) {
+    return false;
+  }
+
+  if (domainLabels.some((label) => !label || label.startsWith("-") || label.endsWith("-"))) {
+    return false;
+  }
+
+  return /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(value);
+}
+
 
 export default function UserManagementPanel({
   users,
@@ -90,6 +157,18 @@ export default function UserManagementPanel({
   const [resetTemporaryPassword, setResetTemporaryPassword] = useState("");
   const [resetConfirmTemporaryPassword, setResetConfirmTemporaryPassword] =
     useState("");
+  const [resetPasswordMessage, setResetPasswordMessage] = useState("");
+  const [createErrorField, setCreateErrorField] = useState<CreateUserField | "">("");
+  const [createShakeField, setCreateShakeField] = useState<CreateUserField | "">("");
+
+  const fullNameInputRef = useRef<HTMLInputElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const permissionLevelInputRef = useRef<HTMLSelectElement>(null);
+  const roleInputRef = useRef<HTMLSelectElement>(null);
+  const temporaryPasswordInputRef = useRef<HTMLInputElement>(null);
+  const confirmTemporaryPasswordInputRef = useRef<HTMLInputElement>(null);
+  const userFeedbackRef = useRef<HTMLDivElement>(null);
+  const resetPasswordCardRef = useRef<HTMLFormElement>(null);
 
   const sortedUsers = useMemo(
     () =>
@@ -105,20 +184,161 @@ export default function UserManagementPanel({
 
   const displayMessage = localMessage || message;
 
+  function getCreateInputClass(field: CreateUserField): string {
+    return [
+      styles.input,
+      createErrorField === field ? styles.inputError : "",
+      createShakeField === field ? styles.shakeField : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  function getCreateSelectClass(field: CreateUserField): string {
+    return [
+      styles.select,
+      createErrorField === field ? styles.inputError : "",
+      createShakeField === field ? styles.shakeField : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  function clearCreateError(field: CreateUserField): void {
+    if (createErrorField === field) {
+      setCreateErrorField("");
+    }
+  }
+
+  function markCreateError(
+    field: CreateUserField,
+    errorMessage: string,
+    inputRef: {
+      readonly current: HTMLInputElement | HTMLSelectElement | null;
+    },
+  ): void {
+    setLocalMessage(errorMessage);
+    setCreateErrorField(field);
+    setCreateShakeField("");
+
+    window.setTimeout(() => {
+      setCreateShakeField(field);
+      inputRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      inputRef.current?.focus({ preventScroll: true });
+    }, 0);
+
+    window.setTimeout(() => {
+      setCreateShakeField("");
+    }, 420);
+  }
+
+  function focusResetPasswordCard(): void {
+    window.setTimeout(() => {
+      resetPasswordCardRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      resetPasswordCardRef.current?.focus({ preventScroll: true });
+    }, 0);
+  }
+
+  function focusUserFeedbackMessage(): void {
+    window.setTimeout(() => {
+      userFeedbackRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      userFeedbackRef.current?.focus({ preventScroll: true });
+    }, 0);
+  }
+
   async function handleCreate(): Promise<void> {
     setLocalMessage("");
 
-    if (temporaryPassword !== confirmTemporaryPassword) {
-      setLocalMessage("Passwords do not match.");
+    const trimmedFullName = fullName.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!trimmedFullName) {
+      markCreateError("fullName", "Full name is required.", fullNameInputRef);
       return;
     }
 
+    if (!trimmedEmail) {
+      markCreateError("email", "Email is required.", emailInputRef);
+      return;
+    }
+
+    if (!isValidEmailAddress(trimmedEmail)) {
+      markCreateError("email", "Enter a valid email address.", emailInputRef);
+      return;
+    }
+
+    if (!permissionLevel) {
+      markCreateError(
+        "permissionLevel",
+        "Permission level is required.",
+        permissionLevelInputRef,
+      );
+      return;
+    }
+
+    if (!role) {
+      markCreateError("role", "Role is required.", roleInputRef);
+      return;
+    }
+
+    if (!temporaryPassword) {
+      markCreateError(
+        "temporaryPassword",
+        "Temporary password is required.",
+        temporaryPasswordInputRef,
+      );
+      return;
+    }
+
+    const passwordPolicyError = getPasswordPolicyError(
+      temporaryPassword,
+      "Temporary password",
+    );
+
+    if (passwordPolicyError) {
+      markCreateError(
+        "temporaryPassword",
+        passwordPolicyError,
+        temporaryPasswordInputRef,
+      );
+      return;
+    }
+
+    if (!confirmTemporaryPassword) {
+      markCreateError(
+        "confirmTemporaryPassword",
+        "Confirm temporary password is required.",
+        confirmTemporaryPasswordInputRef,
+      );
+      return;
+    }
+
+    if (temporaryPassword !== confirmTemporaryPassword) {
+      markCreateError(
+        "confirmTemporaryPassword",
+        "Temporary passwords do not match.",
+        confirmTemporaryPasswordInputRef,
+      );
+      return;
+    }
+
+    setCreateErrorField("");
+    setCreateShakeField("");
     setCreating(true);
 
     try {
       const result = await onCreateUser({
-        email,
-        fullName,
+        email: trimmedEmail,
+        fullName: trimmedFullName,
         permissionLevel,
         role,
         temporaryPassword,
@@ -126,6 +346,7 @@ export default function UserManagementPanel({
       });
 
       setLocalMessage(result.message);
+      focusUserFeedbackMessage();
 
       if (result.ok) {
         setFullName("");
@@ -134,6 +355,8 @@ export default function UserManagementPanel({
         setRole("plumber");
         setTemporaryPassword("");
         setConfirmTemporaryPassword("");
+        setCreateErrorField("");
+        setCreateShakeField("");
       }
     } finally {
       setCreating(false);
@@ -155,6 +378,7 @@ export default function UserManagementPanel({
     try {
       const result = await onToggleActive(user.id, nextActiveState);
       setLocalMessage(result.message);
+      focusUserFeedbackMessage();
     } finally {
       setUpdatingUserId("");
     }
@@ -171,6 +395,8 @@ export default function UserManagementPanel({
     setResetTargetUser(user);
     setResetTemporaryPassword("");
     setResetConfirmTemporaryPassword("");
+    setResetPasswordMessage("");
+    focusResetPasswordCard();
   }
 
   function handleCloseResetPassword(): void {
@@ -181,20 +407,22 @@ export default function UserManagementPanel({
     setResetTargetUser(null);
     setResetTemporaryPassword("");
     setResetConfirmTemporaryPassword("");
+    setResetPasswordMessage("");
   }
 
   async function handleSubmitResetPassword(
     event: FormEvent<HTMLFormElement>,
   ): Promise<void> {
     event.preventDefault();
+    setResetPasswordMessage("");
     setLocalMessage("");
 
     if (!resetTargetUser) {
       return;
     }
 
-    if (resetTemporaryPassword !== resetConfirmTemporaryPassword) {
-      setLocalMessage("Temporary passwords do not match.");
+    if (!resetTemporaryPassword.trim()) {
+      setResetPasswordMessage("Temporary password is required.");
       return;
     }
 
@@ -204,7 +432,17 @@ export default function UserManagementPanel({
     );
 
     if (passwordPolicyError) {
-      setLocalMessage(passwordPolicyError);
+      setResetPasswordMessage(passwordPolicyError);
+      return;
+    }
+
+    if (!resetConfirmTemporaryPassword.trim()) {
+      setResetPasswordMessage("Confirm temporary password is required.");
+      return;
+    }
+
+    if (resetTemporaryPassword !== resetConfirmTemporaryPassword) {
+      setResetPasswordMessage("Temporary passwords do not match.");
       return;
     }
 
@@ -216,13 +454,18 @@ export default function UserManagementPanel({
         resetTemporaryPassword,
       );
 
-      setLocalMessage(result.message);
-
       if (result.ok) {
         setResetTargetUser(null);
         setResetTemporaryPassword("");
         setResetConfirmTemporaryPassword("");
+        setResetPasswordMessage("");
+        setLocalMessage(result.message);
+        focusUserFeedbackMessage();
+        return;
       }
+
+      setResetPasswordMessage(result.message);
+      focusResetPasswordCard();
     } finally {
       setResettingUserId("");
     }
@@ -250,6 +493,7 @@ export default function UserManagementPanel({
     try {
       const result = await onDeleteUser(user.id);
       setLocalMessage(result.message);
+      focusUserFeedbackMessage();
     } finally {
       setDeletingUserId("");
     }
@@ -260,6 +504,8 @@ export default function UserManagementPanel({
       {resetTargetUser ? (
         <div className={styles.modalBackdrop}>
           <form
+            ref={resetPasswordCardRef}
+            tabIndex={-1}
             className={styles.modalCard}
             onSubmit={(event) => void handleSubmitResetPassword(event)}
           >
@@ -276,7 +522,7 @@ export default function UserManagementPanel({
               . They will be asked to choose a new password on next sign in.
             </p>
 
-            <PasswordRequirementsNote compact />
+            <FeedbackMessage message={resetPasswordMessage} />
 
             <label className={styles.field}>
               <span className={styles.label}>Temporary Password</span>
@@ -305,6 +551,8 @@ export default function UserManagementPanel({
                 required
               />
             </label>
+
+            <PasswordRequirementsNote compact />
 
             <div className={styles.modalActions}>
               <button
@@ -342,9 +590,13 @@ export default function UserManagementPanel({
           </button>
         </div>
 
-        {displayMessage ? (
-          <div className={styles.message}>{displayMessage}</div>
-        ) : null}
+        <div
+          ref={userFeedbackRef}
+          tabIndex={-1}
+          className={styles.feedbackFocusTarget}
+        >
+          <FeedbackMessage message={displayMessage} />
+        </div>
 
         <section className={styles.section}>
           <div className={styles.sectionTitle}>Add User</div>
@@ -356,9 +608,14 @@ export default function UserManagementPanel({
               </label>
               <input
                 id="user-full-name"
-                className={styles.input}
+                ref={fullNameInputRef}
+                className={getCreateInputClass("fullName")}
                 value={fullName}
-                onChange={(event) => setFullName(event.target.value)}
+                onChange={(event) => {
+                  setFullName(event.target.value);
+                  clearCreateError("fullName");
+                }}
+                aria-invalid={createErrorField === "fullName"}
               />
             </div>
 
@@ -368,10 +625,15 @@ export default function UserManagementPanel({
               </label>
               <input
                 id="user-email"
-                className={styles.input}
+                ref={emailInputRef}
+                className={getCreateInputClass("email")}
                 type="email"
                 value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  clearCreateError("email");
+                }}
+                aria-invalid={createErrorField === "email"}
               />
             </div>
 
@@ -381,11 +643,14 @@ export default function UserManagementPanel({
               </label>
               <select
                 id="user-permission-level"
-                className={styles.select}
+                ref={permissionLevelInputRef}
+                className={getCreateSelectClass("permissionLevel")}
                 value={permissionLevel}
-                onChange={(event) =>
-                  setPermissionLevel(event.target.value as PermissionLevel)
-                }
+                onChange={(event) => {
+                  setPermissionLevel(event.target.value as PermissionLevel);
+                  clearCreateError("permissionLevel");
+                }}
+                aria-invalid={createErrorField === "permissionLevel"}
               >
                 {PERMISSION_LEVEL_OPTIONS.map((item) => (
                   <option key={item.value} value={item.value}>
@@ -401,9 +666,14 @@ export default function UserManagementPanel({
               </label>
               <select
                 id="user-role"
-                className={styles.select}
+                ref={roleInputRef}
+                className={getCreateSelectClass("role")}
                 value={role}
-                onChange={(event) => setRole(event.target.value as WorkerRole)}
+                onChange={(event) => {
+                  setRole(event.target.value as WorkerRole);
+                  clearCreateError("role");
+                }}
+                aria-invalid={createErrorField === "role"}
               >
                 {WORKER_ROLE_OPTIONS.map((item) => (
                   <option key={item.value} value={item.value}>
@@ -419,10 +689,15 @@ export default function UserManagementPanel({
               </label>
               <input
                 id="user-temp-password"
-                className={styles.input}
+                ref={temporaryPasswordInputRef}
+                className={getCreateInputClass("temporaryPassword")}
                 type="password"
                 value={temporaryPassword}
-                onChange={(event) => setTemporaryPassword(event.target.value)}
+                onChange={(event) => {
+                  setTemporaryPassword(event.target.value);
+                  clearCreateError("temporaryPassword");
+                }}
+                aria-invalid={createErrorField === "temporaryPassword"}
               />
             </div>
 
@@ -433,27 +708,34 @@ export default function UserManagementPanel({
               >
                 Confirm Temporary Password
               </label>
-<PasswordRequirementsNote compact />
+
               <input
                 id="user-temp-password-confirm"
-                className={styles.input}
+                ref={confirmTemporaryPasswordInputRef}
+                className={getCreateInputClass("confirmTemporaryPassword")}
                 type="password"
                 value={confirmTemporaryPassword}
-                onChange={(event) =>
-                  setConfirmTemporaryPassword(event.target.value)
-                }
+                onChange={(event) => {
+                  setConfirmTemporaryPassword(event.target.value);
+                  clearCreateError("confirmTemporaryPassword");
+                }}
+                aria-invalid={createErrorField === "confirmTemporaryPassword"}
               />
             </div>
-          </div>
 
-          <button
-            type="button"
-            className={styles.primaryButton}
-            onClick={() => void handleCreate()}
-            disabled={creating}
-          >
-            {creating ? "Creating User..." : "Create User"}
-          </button>
+<div className={styles.passwordRequirementsRow}>
+  <PasswordRequirementsNote compact />
+</div>
+</div>
+
+<button
+  type="button"
+  className={styles.primaryButton}
+  onClick={() => void handleCreate()}
+  disabled={creating}
+>
+  {creating ? "Creating User..." : "Create User"}
+</button>
         </section>
 
         <section className={styles.section}>

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
-
+import FeedbackMessage from "@/components/FeedbackMessage";
 import AdminDashboard from "@/components/AdminDashboard";
 import JobManagementPanel from "@/components/JobManagementPanel/JobManagementPanel";
 import UserManagementPanel from "@/components/UserManagementPanel/UserManagementPanel";
@@ -201,6 +201,31 @@ function convertProfileToCurrentUser(
   };
 }
 
+function normalizeLoginErrorMessage(error: unknown): string {
+  const rawMessage =
+    error instanceof Error ? error.message : "Sign in failed.";
+
+  const value = rawMessage.toLowerCase();
+
+  if (
+    value.includes("user is disabled") ||
+    value.includes("userdisabled") ||
+    value.includes("user disabled") ||
+    value.includes("user does not exist") ||
+    value.includes("usernotfound") ||
+    value.includes("notauthorized") ||
+    value.includes("incorrect username or password")
+  ) {
+    return "Incorrect username or password.";
+  }
+
+  if (value.includes("attempt limit exceeded")) {
+    return "Too many attempts. Please wait a few minutes and try again.";
+  }
+
+  return rawMessage;
+}
+
 function getApiBaseUrl(): string {
   const apiBaseUrl = process.env.NEXT_PUBLIC_AHLOGU_API_URL;
 
@@ -350,6 +375,16 @@ function CognitoLoginCard({
   onConfirmNewPasswordChange,
   onSubmit,
 }: CognitoLoginCardProps) {
+  const inputStyle = {
+    width: "100%",
+    border: "1px solid rgba(255,255,255,0.14)",
+    borderRadius: "16px",
+    padding: "14px 16px",
+    background: "rgba(255,255,255,0.08)",
+    color: "#eef7f3",
+    font: "inherit",
+  };
+
   return (
     <main
       style={{
@@ -362,6 +397,17 @@ function CognitoLoginCard({
         color: "#eef7f3",
       }}
     >
+      <style>
+        {`@keyframes loginMessageShake {
+          0% { transform: translateX(0); }
+          20% { transform: translateX(-5px); }
+          40% { transform: translateX(5px); }
+          60% { transform: translateX(-4px); }
+          80% { transform: translateX(4px); }
+          100% { transform: translateX(0); }
+        }`}
+      </style>
+
       <form
         onSubmit={onSubmit}
         style={{
@@ -383,21 +429,14 @@ function CognitoLoginCard({
             priority
             style={{ objectFit: "contain", marginBottom: "18px" }}
           />
-
         </div>
 
         {message ? (
           <div
-            style={{
-              marginBottom: "16px",
-              padding: "12px 14px",
-              borderRadius: "16px",
-              background: "rgba(255,255,255,0.1)",
-              color: "#eef7f3",
-              lineHeight: 1.45,
-            }}
+            key={message}
+            style={{ animation: "loginMessageShake 0.38s ease-in-out" }}
           >
-            {message}
+            <FeedbackMessage message={message} />
           </div>
         ) : null}
 
@@ -413,20 +452,13 @@ function CognitoLoginCard({
             >
               Email
               <input
-                type="email"
+                type="text"
+                inputMode="email"
                 value={email}
                 onChange={(event) => onEmailChange(event.target.value)}
                 autoComplete="email"
                 required
-                style={{
-                  width: "100%",
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  borderRadius: "16px",
-                  padding: "14px 16px",
-                  background: "rgba(255,255,255,0.08)",
-                  color: "#eef7f3",
-                  font: "inherit",
-                }}
+                style={inputStyle}
               />
             </label>
 
@@ -445,15 +477,7 @@ function CognitoLoginCard({
                 onChange={(event) => onPasswordChange(event.target.value)}
                 autoComplete="current-password"
                 required
-                style={{
-                  width: "100%",
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  borderRadius: "16px",
-                  padding: "14px 16px",
-                  background: "rgba(255,255,255,0.08)",
-                  color: "#eef7f3",
-                  font: "inherit",
-                }}
+                style={inputStyle}
               />
             </label>
           </>
@@ -474,15 +498,7 @@ function CognitoLoginCard({
                 onChange={(event) => onNewPasswordChange(event.target.value)}
                 autoComplete="new-password"
                 required
-                style={{
-                  width: "100%",
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  borderRadius: "16px",
-                  padding: "14px 16px",
-                  background: "rgba(255,255,255,0.08)",
-                  color: "#eef7f3",
-                  font: "inherit",
-                }}
+                style={inputStyle}
               />
             </label>
 
@@ -503,15 +519,7 @@ function CognitoLoginCard({
                 }
                 autoComplete="new-password"
                 required
-                style={{
-                  width: "100%",
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  borderRadius: "16px",
-                  padding: "14px 16px",
-                  background: "rgba(255,255,255,0.08)",
-                  color: "#eef7f3",
-                  font: "inherit",
-                }}
+                style={inputStyle}
               />
             </label>
           </>
@@ -538,7 +546,7 @@ function CognitoLoginCard({
             ? "Please wait…"
             : requiresNewPassword
               ? "Set new password"
-              : "Sign in"}
+              : "Sign In"}
         </button>
       </form>
     </main>
@@ -660,7 +668,14 @@ export default function Page() {
         return;
       }
 
-      const result = await signInWithCognito(email.trim(), password);
+      const trimmedEmail = email.trim().toLowerCase();
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+        setMessage("Enter a valid email address.");
+        return;
+      }
+
+      const result = await signInWithCognito(trimmedEmail, password);
 
       if (result.status === "new-password-required" && result.cognitoUser) {
         setNewPasswordUser(result.cognitoUser);
@@ -676,9 +691,7 @@ export default function Page() {
 
       await finishSignIn(result.session);
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Sign in failed.",
-      );
+      setMessage(normalizeLoginErrorMessage(error));
     } finally {
       setIsBusy(false);
     }
@@ -1001,25 +1014,52 @@ export default function Page() {
     event.preventDefault();
     setAccountMessage("");
 
-    const passwordPolicyError = getPasswordPolicyError(
-      newPasswordInput,
-      "New password",
-    );
-
-    if (passwordPolicyError) {
-      setAccountMessage(passwordPolicyError);
-      return;
-    }
-
-    if (newPasswordInput !== confirmPasswordInput) {
-      setAccountMessage("New passwords do not match.");
-      return;
-    }
+    const currentPasswordValue = currentPasswordInput.trim();
+    const newPasswordValue = newPasswordInput.trim();
+    const confirmPasswordValue = confirmPasswordInput.trim();
+    const signInIdentifier = currentUser?.username || currentUser?.id || email;
 
     setChangePasswordBusy(true);
 
     try {
-      await changeCurrentCognitoPassword(currentPasswordInput, newPasswordInput);
+      try {
+        const verificationResult = await signInWithCognito(
+          signInIdentifier,
+          currentPasswordValue,
+        );
+
+        if (!verificationResult.session) {
+          setAccountMessage("Incorrect Current Password.");
+          return;
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Incorrect password.";
+
+        setAccountMessage(
+          errorMessage.includes("Attempt limit exceeded")
+            ? "Too many attempts. Please wait a few minutes and try again."
+            : "Incorrect Current Password.",
+        );
+        return;
+      }
+
+      const passwordPolicyError = getPasswordPolicyError(
+        newPasswordValue,
+        "New password",
+      );
+
+      if (passwordPolicyError) {
+        setAccountMessage(passwordPolicyError);
+        return;
+      }
+
+      if (newPasswordValue !== confirmPasswordValue) {
+        setAccountMessage("New passwords do not match.");
+        return;
+      }
+
+      await changeCurrentCognitoPassword(currentPasswordValue, newPasswordValue);
       setCurrentPasswordInput("");
       setNewPasswordInput("");
       setConfirmPasswordInput("");
@@ -1031,7 +1071,7 @@ export default function Page() {
 
       setAccountMessage(
         errorMessage === "Incorrect username or password."
-          ? "Incorrect password."
+          ? "Incorrect Current Password."
           : errorMessage.includes("Attempt limit exceeded")
             ? "Too many attempts. Please wait a few minutes and try again."
             : errorMessage,
@@ -1115,8 +1155,7 @@ export default function Page() {
                 border: "1px solid rgba(255,255,255,0.14)",
               }}
             >
-              <h2 style={{ marginTop: 0 }}>Account</h2>
-              <p style={{ lineHeight: 1.5 }}>{accountMessage}</p>
+              <FeedbackMessage message={accountMessage} />
               <button
                 type="button"
                 onClick={() => setAccountMessage("")}
@@ -1165,18 +1204,7 @@ export default function Page() {
             <PasswordRequirementsNote />
 
               {accountMessage ? (
-                <div
-                  style={{
-                    marginBottom: "16px",
-                    padding: "12px 14px",
-                    borderRadius: "16px",
-                    background: "rgba(255,255,255,0.1)",
-                    color: "#eef7f3",
-                    lineHeight: 1.45,
-                  }}
-                >
-                  {accountMessage}
-                </div>
+                              <FeedbackMessage message={accountMessage} />
               ) : null}
 
               <label
@@ -1351,20 +1379,7 @@ export default function Page() {
 
             <PasswordRequirementsNote />
 
-            {accountMessage ? (
-              <div
-                style={{
-                  marginBottom: "16px",
-                  padding: "12px 14px",
-                  borderRadius: "16px",
-                  background: "rgba(255,255,255,0.1)",
-                  color: "#eef7f3",
-                  lineHeight: 1.45,
-                }}
-              >
-                {accountMessage}
-              </div>
-            ) : null}
+            <FeedbackMessage message={accountMessage} />
 
             <label
               style={{
@@ -1380,7 +1395,7 @@ export default function Page() {
                 value={currentPasswordInput}
                 onChange={(event) => setCurrentPasswordInput(event.target.value)}
                 autoComplete="current-password"
-                required
+                  required
                 style={{
                   width: "100%",
                   border: "1px solid rgba(255,255,255,0.14)",
@@ -1407,7 +1422,7 @@ export default function Page() {
                 value={newPasswordInput}
                 onChange={(event) => setNewPasswordInput(event.target.value)}
                 autoComplete="new-password"
-                required
+                  required
                 style={{
                   width: "100%",
                   border: "1px solid rgba(255,255,255,0.14)",
@@ -1434,7 +1449,7 @@ export default function Page() {
                 value={confirmPasswordInput}
                 onChange={(event) => setConfirmPasswordInput(event.target.value)}
                 autoComplete="new-password"
-                required
+                  required
                 style={{
                   width: "100%",
                   border: "1px solid rgba(255,255,255,0.14)",
@@ -1507,8 +1522,7 @@ export default function Page() {
               border: "1px solid rgba(255,255,255,0.14)",
             }}
           >
-            <h2 style={{ marginTop: 0 }}>Account</h2>
-            <p style={{ lineHeight: 1.5 }}>{accountMessage}</p>
+            <FeedbackMessage message={accountMessage} />
             <button
               type="button"
               onClick={() => setAccountMessage("")}

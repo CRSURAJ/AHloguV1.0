@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
+import FeedbackMessage from "@/components/FeedbackMessage";
 import { useJobs } from "@/hooks/useJobs";
 import { WORKER_ROLE_OPTIONS } from "@/types/work";
 import type { Job, JobDrawing, WorkerRole } from "@/types/work";
@@ -24,6 +25,14 @@ type JobFormState = {
   jobDrawings: Job["jobDrawings"];
   isActive: boolean;
 };
+
+type JobFormField =
+  | "caseNo"
+  | "jobId"
+  | "orderNo"
+  | "jobName"
+  | "customerName"
+  | "assignedRoles";
 
 const EMPTY_FORM: JobFormState = {
   caseNo: "",
@@ -100,6 +109,17 @@ function getJobTitle(job: Job): string {
   return job.jobName || job.jobId || job.caseNo || "Untitled Job";
 }
 
+function isDuplicateJobIdMessage(message: string): boolean {
+  const value = message.toLowerCase();
+
+  return (
+    value.includes("job id") &&
+    (value.includes("already exists") ||
+      value.includes("unique") ||
+      value.includes("duplicate"))
+  );
+}
+
 export default function JobManagementPanel({ onClose }: JobManagementPanelProps) {
   const {
     jobs,
@@ -117,6 +137,18 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
   const [form, setForm] = useState<JobFormState>(EMPTY_FORM);
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
   const [jobDrawingMessage, setJobDrawingMessage] = useState("");
+  const [jobFormMessage, setJobFormMessage] = useState("");
+  const [jobErrorField, setJobErrorField] = useState<JobFormField | "">("");
+  const [jobShakeField, setJobShakeField] = useState<JobFormField | "">("");
+
+  const caseNoInputRef = useRef<HTMLInputElement>(null);
+  const jobIdInputRef = useRef<HTMLInputElement>(null);
+  const orderNoInputRef = useRef<HTMLInputElement>(null);
+  const jobNameInputRef = useRef<HTMLInputElement>(null);
+  const customerNameInputRef = useRef<HTMLInputElement>(null);
+  const assignedRolesRef = useRef<HTMLDivElement>(null);
+  const jobFeedbackRef = useRef<HTMLDivElement>(null);
+  const jobFormCardRef = useRef<HTMLDivElement>(null);
 
   const sortedJobs = useMemo(
     () =>
@@ -127,6 +159,63 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
       }),
     [jobs]
   );
+
+  function getJobInputClass(field: JobFormField): string {
+    return [
+      jobErrorField === field ? styles.inputError : "",
+      jobShakeField === field ? styles.shakeField : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  function getRoleSectionClass(): string {
+    return [
+      styles.roleSection,
+      jobErrorField === "assignedRoles" ? styles.roleSectionError : "",
+      jobShakeField === "assignedRoles" ? styles.shakeField : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  function clearJobFormError(field?: JobFormField): void {
+    if (!field || jobErrorField === field) {
+      setJobErrorField("");
+    }
+
+    if (jobFormMessage) {
+      setJobFormMessage("");
+    }
+  }
+
+  function markJobFormError(
+    field: JobFormField,
+    message: string,
+    targetRef: {
+      readonly current: HTMLElement | null;
+    },
+  ): void {
+    setJobFormMessage(message);
+    setJobErrorField(field);
+    setJobShakeField("");
+
+    window.setTimeout(() => {
+      setJobShakeField(field);
+      targetRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+
+      if (targetRef.current instanceof HTMLInputElement) {
+        targetRef.current.focus({ preventScroll: true });
+      }
+    }, 0);
+
+    window.setTimeout(() => {
+      setJobShakeField("");
+    }, 420);
+  }
 
   function updateField<K extends keyof JobFormState>(
     field: K,
@@ -139,7 +228,7 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
 
     if (jobMessage) clearJobMessage();
     if (jobDrawingMessage) setJobDrawingMessage("");
-    if (jobDrawingMessage) setJobDrawingMessage("");
+    clearJobFormError(field as JobFormField);
   }
 
   function toggleRole(role: WorkerRole): void {
@@ -156,13 +245,26 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
 
     if (jobMessage) clearJobMessage();
     if (jobDrawingMessage) setJobDrawingMessage("");
-    if (jobDrawingMessage) setJobDrawingMessage("");
+    clearJobFormError("assignedRoles");
+  }
+
+  function focusJobFormCard(): void {
+    window.setTimeout(() => {
+      jobFormCardRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      jobFormCardRef.current?.focus({ preventScroll: true });
+    }, 0);
   }
 
   function resetForm(): void {
     setForm(EMPTY_FORM);
     setEditingJobId(null);
     setJobDrawingMessage("");
+    setJobFormMessage("");
+    setJobErrorField("");
+    setJobShakeField("");
   }
 
   function startEdit(job: Job): void {
@@ -182,7 +284,10 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
 
     if (jobMessage) clearJobMessage();
     if (jobDrawingMessage) setJobDrawingMessage("");
-    if (jobDrawingMessage) setJobDrawingMessage("");
+    if (jobFormMessage) setJobFormMessage("");
+    setJobErrorField("");
+    setJobShakeField("");
+    focusJobFormCard();
   }
 
   async function handleJobDrawingsUpload(files: FileList | null): Promise<void> {
@@ -234,18 +339,94 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
     setJobDrawingMessage("");
   }
 
+  function focusJobFeedbackMessage(): void {
+    window.setTimeout(() => {
+      jobFeedbackRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      jobFeedbackRef.current?.focus({ preventScroll: true });
+    }, 0);
+  }
+
   async function handleSubmit(): Promise<void> {
+    setJobFormMessage("");
+
+    if (!form.caseNo.trim()) {
+      markJobFormError("caseNo", "Case No. is required.", caseNoInputRef);
+      return;
+    }
+
+    if (!form.jobId.trim()) {
+      markJobFormError("jobId", "Job ID is required.", jobIdInputRef);
+      return;
+    }
+
+    if (!form.orderNo.trim()) {
+      markJobFormError("orderNo", "Order No. is required.", orderNoInputRef);
+      return;
+    }
+
+    if (!form.jobName.trim()) {
+      markJobFormError("jobName", "Job Name is required.", jobNameInputRef);
+      return;
+    }
+
+    if (!form.customerName.trim()) {
+      markJobFormError("customerName", "Customer / Site is required.", customerNameInputRef);
+      return;
+    }
+
+    if (form.assignedRoles.length === 0) {
+      markJobFormError("assignedRoles", "Assign at least one role.", assignedRolesRef);
+      return;
+    }
+
     if (editingJobId) {
       const result = await handleUpdateJob(editingJobId, form);
 
-      if (result.ok) resetForm();
+      if (!result.ok && isDuplicateJobIdMessage(result.message)) {
+        markJobFormError(
+          "jobId",
+          "Job ID already exists. Use a unique Job ID.",
+          jobIdInputRef,
+        );
+        return;
+      }
+
+      if (result.ok) {
+        resetForm();
+        setJobFormMessage(result.message);
+        focusJobFeedbackMessage();
+      }
 
       return;
     }
 
     const result = await handleCreateJob(form);
 
-    if (result.ok) resetForm();
+    if (!result.ok && isDuplicateJobIdMessage(result.message)) {
+      markJobFormError(
+        "jobId",
+        "Job ID already exists. Use a unique Job ID.",
+        jobIdInputRef,
+      );
+      return;
+    }
+
+    if (result.ok) {
+      resetForm();
+      setJobFormMessage(result.message);
+      focusJobFeedbackMessage();
+    }
+  }
+
+  async function handleToggleJobStatus(job: Job): Promise<void> {
+    setJobFormMessage("");
+
+    await handleToggleJobActive(job.id);
+
+    focusJobFeedbackMessage();
   }
 
   async function handleDelete(job: Job): Promise<void> {
@@ -257,7 +438,11 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
 
     const result = await handleDeleteJob(job.id);
 
-    if (result.ok && editingJobId === job.id) resetForm();
+    if (result.ok && editingJobId === job.id) {
+      resetForm();
+    }
+
+    focusJobFeedbackMessage();
   }
 
   return (
@@ -294,10 +479,20 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
           </div>
         </div>
 
-        {jobMessage ? <p className={styles.message}>{jobMessage}</p> : null}
-        {jobDrawingMessage ? <p className={styles.message}>{jobDrawingMessage}</p> : null}
+        <div
+          ref={jobFeedbackRef}
+          tabIndex={-1}
+          className={styles.feedbackFocusTarget}
+        >
+          <FeedbackMessage message={jobFormMessage || jobMessage} />
+          <FeedbackMessage message={jobDrawingMessage} />
+        </div>
 
-        <div className={styles.card}>
+        <div
+          ref={jobFormCardRef}
+          tabIndex={-1}
+          className={styles.card}
+        >
           <div className={styles.cardHeader}>
             <h3>{editingJobId ? "Edit Job" : "Add Job"}</h3>
 
@@ -316,42 +511,57 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
             <label>
               Case No.
               <input
+                ref={caseNoInputRef}
+                className={getJobInputClass("caseNo")}
                 value={form.caseNo}
                 onChange={(event) => updateField("caseNo", event.target.value)}
+                aria-invalid={jobErrorField === "caseNo"}
               />
             </label>
 
             <label>
               Job ID
               <input
+                ref={jobIdInputRef}
+                className={getJobInputClass("jobId")}
                 value={form.jobId}
                 onChange={(event) => updateField("jobId", event.target.value)}
+                aria-invalid={jobErrorField === "jobId"}
               />
             </label>
 
             <label>
               Order No.
               <input
+                ref={orderNoInputRef}
+                className={getJobInputClass("orderNo")}
                 value={form.orderNo}
                 onChange={(event) => updateField("orderNo", event.target.value)}
+                aria-invalid={jobErrorField === "orderNo"}
               />
             </label>
 
             <label>
               Job Name
               <input
+                ref={jobNameInputRef}
+                className={getJobInputClass("jobName")}
                 value={form.jobName}
                 onChange={(event) => updateField("jobName", event.target.value)}
+                aria-invalid={jobErrorField === "jobName"}
               />
             </label>
 
             <label>
               Customer / Site
               <input
+                ref={customerNameInputRef}
+                className={getJobInputClass("customerName")}
                 value={form.customerName}
                 onChange={(event) =>
                   updateField("customerName", event.target.value)
                 }
+                aria-invalid={jobErrorField === "customerName"}
               />
             </label>
 
@@ -409,7 +619,7 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
             />
           </label>
 
-          <div className={styles.roleSection}>
+          <div ref={assignedRolesRef} className={getRoleSectionClass()}>
             <p>Assign To</p>
 
             <div className={styles.roleGrid}>
@@ -522,7 +732,7 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
 
                   <button
                     type="button"
-                    onClick={() => void handleToggleJobActive(job.id)}
+                    onClick={() => void handleToggleJobStatus(job)}
                   >
                     {job.isActive ? "Deactivate" : "Activate"}
                   </button>

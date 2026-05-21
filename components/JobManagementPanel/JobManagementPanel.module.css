@@ -553,3 +553,59 @@
 .formGrid input {
   height: 46px;
 }
+
+
+.inputError {
+  border-color: rgba(255, 92, 92, 0.78) !important;
+  box-shadow: 0 0 0 3px rgba(255, 92, 92, 0.16) !important;
+}
+
+.roleSectionError {
+  border: 1px solid rgba(255, 92, 92, 0.58) !important;
+  border-radius: 18px;
+  background: rgba(255, 92, 92, 0.08);
+  box-shadow: 0 0 0 3px rgba(255, 92, 92, 0.12);
+}
+
+.shakeField {
+  animation: shakeField 0.38s ease-in-out;
+}
+
+@keyframes shakeField {
+  0% {
+    transform: translateX(0);
+  }
+
+  20% {
+    transform: translateX(-5px);
+  }
+
+  40% {
+    transform: translateX(5px);
+  }
+
+  60% {
+    transform: translateX(-4px);
+  }
+
+  80% {
+    transform: translateX(4px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.feedbackFocusTarget {
+  outline: none;
+  scroll-margin-top: 24px;
+}
+
+.card:focus {
+  outline: none;
+}
+
+.card {
+  scroll-margin-top: 24px;
+}
