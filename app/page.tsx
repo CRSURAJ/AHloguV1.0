@@ -1032,7 +1032,9 @@ export default function Page() {
       setAccountMessage(
         errorMessage === "Incorrect username or password."
           ? "Incorrect password."
-          : errorMessage,
+          : errorMessage.includes("Attempt limit exceeded")
+            ? "Too many attempts. Please wait a few minutes and try again."
+            : errorMessage,
       );
     } finally {
       setChangePasswordBusy(false);
@@ -1159,6 +1161,8 @@ export default function Page() {
               }}
             >
               <h2 style={{ marginTop: 0 }}>Change Password</h2>
+
+            <PasswordRequirementsNote />
 
               {accountMessage ? (
                 <div
