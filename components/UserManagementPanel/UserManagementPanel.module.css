@@ -61,10 +61,23 @@
   color: #eef7f3;
   border: 1px solid rgba(178, 223, 220, 0.16);
 }
+  .closeButton:hover {
+  border-color: rgba(83, 188, 123, 0.34);
+  background: rgba(8, 34, 32, 0.95);
+}
+
+.secondaryButton:hover {
+  border-color: rgba(83, 188, 123, 0.34);
+  background: rgba(8, 34, 32, 0.95);
+}
 
 .primaryButton {
   background: #53bc7b;
   color: #072c29;
+}
+
+.primaryButton:hover {
+  filter: brightness(1.04);
 }
 
 .message {
@@ -259,29 +272,22 @@
   margin-bottom: 12px;
 }
 
-.iconDangerButton {
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
-  border-radius: 12px;
+.dangerButton {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 0;
+  font-weight: 700;
+  cursor: pointer;
   border: 1px solid rgba(229, 57, 53, 0.2);
   background: rgba(229, 57, 53, 0.08);
   color: #ffb9b9;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  transition:
-    background 0.2s ease,
-    transform 0.2s ease,
-    border-color 0.2s ease;
+
 }
 
-.iconDangerButton:hover {
+.dangerButton:hover {
   background: rgba(229, 57, 53, 0.16);
   border-color: rgba(229, 57, 53, 0.34);
-  transform: translateY(-1px);
 }
 
 .iconSvg {

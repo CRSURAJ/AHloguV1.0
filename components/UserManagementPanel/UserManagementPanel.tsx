@@ -825,17 +825,17 @@ export default function UserManagementPanel({
                       {isUpdatingUser
                         ? "Updating..."
                         : user.isActive
-                          ? "Deactivate User"
-                          : "Activate User"}
+                          ? "Deactivate"
+                          : "Activate"}
                     </button>
 
                     <button
                       type="button"
-                      className={styles.secondaryButton}
+                      className={styles.dangerButton}
                       onClick={() => void handleDeleteUser(user)}
                       disabled={isCurrentUser || isUpdatingUser || isResettingUser || isDeletingUser || !user.id}
                     >
-                      {isDeletingUser ? "Deleting..." : "🗑 Delete User"}
+                      {isDeletingUser ? "Deleting..." : "Delete"}
                     </button>
                   </div>
                 </div>
